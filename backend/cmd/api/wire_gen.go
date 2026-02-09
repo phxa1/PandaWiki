@@ -84,7 +84,7 @@ func createApp() (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	userHandler := v1.NewUserHandler(echo, baseHandler, logger, userUsecase, authMiddleware, configConfig)
+	userHandler := v1.NewUserHandler(echo, baseHandler, logger, userUsecase, authMiddleware, configConfig, cacheCache)
 	conversationRepository := pg2.NewConversationRepository(db, logger)
 	modelRepository := pg2.NewModelRepository(db, logger)
 	promptRepo := pg2.NewPromptRepo(db, logger)
@@ -112,9 +112,9 @@ func createApp() (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	appUsecase := usecase.NewAppUsecase(appRepository, authRepo, nodeRepository, nodeUsecase, logger, configConfig, chatUsecase, cacheCache)
+	appUsecase := usecase.NewAppUsecase(appRepository, authRepo, nodeRepository, knowledgeBaseRepository, nodeUsecase, logger, configConfig, chatUsecase, cacheCache)
 	appHandler := v1.NewAppHandler(echo, baseHandler, logger, authMiddleware, appUsecase, modelUsecase, conversationUsecase, configConfig)
-	fileUsecase := usecase.NewFileUsecase(logger, minioClient, configConfig)
+	fileUsecase := usecase.NewFileUsecase(logger, minioClient, configConfig, systemSettingRepo)
 	fileHandler := v1.NewFileHandler(echo, baseHandler, logger, authMiddleware, minioClient, configConfig, fileUsecase)
 	modelHandler := v1.NewModelHandler(echo, baseHandler, logger, authMiddleware, modelUsecase, llmUsecase)
 	conversationHandler := v1.NewConversationHandler(echo, baseHandler, logger, authMiddleware, conversationUsecase)
@@ -166,7 +166,7 @@ func createApp() (*App, error) {
 	wechatRepository := pg2.NewWechatRepository(db, logger)
 	wechatUsecase := usecase.NewWechatUsecase(logger, appUsecase, chatUsecase, wechatRepository, authRepo)
 	wecomUsecase := usecase.NewWecomUsecase(logger, cacheCache, appUsecase, chatUsecase, authRepo)
-	wechatAppUsecase := usecase.NewWechatAppUsecase(logger, appUsecase, chatUsecase, wechatRepository, authRepo)
+	wechatAppUsecase := usecase.NewWechatAppUsecase(logger, appUsecase, chatUsecase, wechatRepository, authRepo, appRepository)
 	shareWechatHandler := share.NewShareWechatHandler(echo, baseHandler, logger, appUsecase, conversationUsecase, wechatUsecase, wecomUsecase, wechatAppUsecase)
 	shareCaptchaHandler := share.NewShareCaptchaHandler(baseHandler, echo, logger)
 	openapiV1Handler := share.NewOpenapiV1Handler(echo, baseHandler, logger, authUsecase, appUsecase)
@@ -185,7 +185,8 @@ func createApp() (*App, error) {
 		OpenapiV1Handler:         openapiV1Handler,
 		ShareCommonHandler:       shareCommonHandler,
 	}
-	client, err := telemetry.NewClient(logger, knowledgeBaseRepository)
+	mcpRepository := pg2.NewMCPRepository(db, logger)
+	client, err := telemetry.NewClient(logger, knowledgeBaseRepository, modelUsecase, userUsecase, nodeRepository, conversationRepository, mcpRepository, configConfig)
 	if err != nil {
 		return nil, err
 	}

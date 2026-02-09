@@ -106,7 +106,7 @@ func (r *NodeRepository) Create(ctx context.Context, req *domain.CreateNodeReq, 
 			UpdatedAt: now,
 			EditTime:  now,
 			RagInfo: domain.RagInfo{
-				Status:  consts.NodeRagStatusBasicPending,
+				Status:  consts.NodeRagStatusPending,
 				Message: "",
 			},
 			Permissions: domain.NodePermissions{
@@ -155,6 +155,32 @@ func (r *NodeRepository) GetLatestNodeReleaseByNodeIDs(ctx context.Context, kbID
 		return nil, err
 	}
 	return nodeReleases, nil
+}
+
+func (r *NodeRepository) GetNodeReleasePublisherMap(ctx context.Context, kbID string) (map[string]string, error) {
+	type Result struct {
+		NodeID      string `gorm:"column:node_id"`
+		PublisherID string `gorm:"column:publisher_id"`
+	}
+
+	var results []Result
+	if err := r.db.WithContext(ctx).
+		Model(&domain.NodeRelease{}).
+		Select("node_id, publisher_id").
+		Where("kb_id = ?", kbID).
+		Where("node_releases.doc_id != '' ").
+		Find(&results).Error; err != nil {
+		return nil, err
+	}
+
+	publisherMap := make(map[string]string)
+	for _, result := range results {
+		if result.PublisherID != "" {
+			publisherMap[result.NodeID] = result.PublisherID
+		}
+	}
+
+	return publisherMap, nil
 }
 
 func (r *NodeRepository) UpdateNodeContent(ctx context.Context, req *domain.UpdateNodeReq, userId string) error {
@@ -683,7 +709,7 @@ func (r *NodeRepository) GetNodeReleaseListByKBID(ctx context.Context, kbID stri
 		Where("kb_release_node_releases.kb_id = ?", kbID).
 		Where("kb_release_node_releases.release_id = ?", kbRelease.ID).
 		Where("nodes.permissions->>'visible' != ?", consts.NodeAccessPermClosed).
-		Select("node_releases.node_id as id, node_releases.name, node_releases.type, node_releases.parent_id, nodes.position, node_releases.meta->>'emoji' as emoji, node_releases.updated_at, nodes.permissions").
+		Select("node_releases.node_id as id, node_releases.name, node_releases.type, node_releases.parent_id, nodes.position, node_releases.meta->>'emoji' as emoji, node_releases.updated_at, nodes.permissions, nodes.meta").
 		Find(&nodes).Error; err != nil {
 		return nil, err
 	}
@@ -1151,4 +1177,15 @@ func (r *NodeRepository) GetNodeIdsByDocIds(ctx context.Context, docIds []string
 	}
 
 	return docToNodeMap, nil
+}
+
+func (r *NodeRepository) GetNodeCount(ctx context.Context) (int, error) {
+	var count int64
+	err := r.db.WithContext(ctx).
+		Model(&domain.Node{}).
+		Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+	return int(count), nil
 }

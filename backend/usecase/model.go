@@ -9,6 +9,7 @@ import (
 
 	modelkitDomain "github.com/chaitin/ModelKit/v2/domain"
 	modelkit "github.com/chaitin/ModelKit/v2/usecase"
+
 	"github.com/chaitin/panda-wiki/config"
 	"github.com/chaitin/panda-wiki/consts"
 	"github.com/chaitin/panda-wiki/domain"
@@ -113,6 +114,24 @@ func (u *ModelUsecase) Update(ctx context.Context, req *domain.UpdateModelReq) e
 		updatedEmbeddingModel = true
 	}
 	if err := u.modelRepo.Update(ctx, req); err != nil {
+		return err
+	}
+	data := &domain.Model{
+		Provider:   req.Provider,
+		Model:      req.Model,
+		Type:       req.Type,
+		APIKey:     req.APIKey,
+		BaseURL:    req.BaseURL,
+		APIHeader:  req.APIHeader,
+		APIVersion: req.APIVersion,
+	}
+	if req.IsActive != nil {
+		data.IsActive = *req.IsActive
+	}
+	if req.Parameters != nil {
+		data.Parameters = *req.Parameters
+	}
+	if err := u.ragStore.UpsertModel(ctx, data); err != nil {
 		return err
 	}
 	// 模型更新成功后，如果更新嵌入模型，则触发记录更新
@@ -222,7 +241,7 @@ func (u *ModelUsecase) SwitchMode(ctx context.Context, req *domain.SwitchModeReq
 // updateModeSettingConfig 读取当前设置并更新，然后持久化
 func (u *ModelUsecase) updateModeSettingConfig(ctx context.Context, mode, apiKey, chatModel string, isManualEmbeddingUpdated bool) (*domain.ModelModeSetting, error) {
 	// 读取当前设置
-	setting, err := u.systemSettingRepo.GetSystemSetting(ctx, string(consts.SystemSettingModelMode))
+	setting, err := u.systemSettingRepo.GetSystemSetting(ctx, consts.SystemSettingModelMode)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current model setting: %w", err)
 	}
@@ -257,7 +276,7 @@ func (u *ModelUsecase) updateModeSettingConfig(ctx context.Context, mode, apiKey
 }
 
 func (u *ModelUsecase) GetModelModeSetting(ctx context.Context) (domain.ModelModeSetting, error) {
-	setting, err := u.systemSettingRepo.GetSystemSetting(ctx, string(consts.SystemSettingModelMode))
+	setting, err := u.systemSettingRepo.GetSystemSetting(ctx, consts.SystemSettingModelMode)
 	if err != nil {
 		return domain.ModelModeSetting{}, fmt.Errorf("failed to get model mode setting: %w", err)
 	}
@@ -318,7 +337,7 @@ func (u *ModelUsecase) updateRAGModelsByMode(ctx context.Context, mode, autoMode
 		// 更新RAG存储中的模型
 		if model != nil {
 			// rag store中更新失败不影响其他模型更新
-			if err := u.ragStore.UpdateModel(ctx, model); err != nil {
+			if err := u.ragStore.UpsertModel(ctx, model); err != nil {
 				u.logger.Error("failed to update model in RAG store", log.String("model_id", model.ID), log.String("type", string(modelType)), log.Any("error", err))
 				continue
 			}

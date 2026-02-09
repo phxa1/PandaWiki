@@ -1,9 +1,8 @@
 import { AppDetail, HeaderSetting } from '@/api';
 import UploadFile from '@/components/UploadFile';
-import { Stack, Box, TextField } from '@mui/material';
+import { Stack, Box, TextField, SvgIconProps } from '@mui/material';
 import DragBrand from '../basicComponents/DragBrand';
-import { Icon } from '@ctzhian/ui';
-import { Dispatch, SetStateAction, useEffect, useMemo } from 'react';
+import { Dispatch, SetStateAction, useEffect } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { useAppDispatch, useAppSelector } from '@/store';
 import { setAppPreviewData } from '@/store/slices/config';
@@ -12,6 +11,13 @@ import Switch from '../basicComponents/Switch';
 import DragSocialInfo from '../basicComponents/DragSocialInfo';
 import VersionMask from '@/components/VersionMask';
 import { PROFESSION_VERSION_PERMISSION } from '@/constant/version';
+import { IconTianjia } from '@panda-wiki/icons';
+import {
+  IconWeixingongzhonghao,
+  IconDianhua,
+  IconWeixingongzhonghaoDaiyanse,
+  IconDianhua1,
+} from '@panda-wiki/icons';
 
 interface FooterConfigProps {
   data?: AppDetail | null;
@@ -21,8 +27,8 @@ interface FooterConfigProps {
 export interface Option {
   key: string;
   value: string;
-  type: string;
-  config_type?: string;
+  type: React.ComponentType<SvgIconProps>;
+  config_type?: React.ComponentType<SvgIconProps>;
   text_placeholder?: string;
   text_label?: string;
 }
@@ -30,16 +36,16 @@ export const options: Option[] = [
   {
     key: 'wechat_oa',
     value: '微信公众号',
-    type: 'icon-weixingongzhonghao',
-    config_type: 'icon-weixingongzhonghao-daiyanse',
+    type: IconWeixingongzhonghao,
+    config_type: IconWeixingongzhonghaoDaiyanse,
     text_placeholder: '请输入公众号名称',
     text_label: '公众号名称',
   },
   {
     key: 'phone',
     value: '电话',
-    type: 'icon-dianhua',
-    config_type: 'icon-dianhua1',
+    type: IconDianhua,
+    config_type: IconDianhua1,
     text_placeholder: '请输入文字',
     text_label: '文字',
   },
@@ -62,6 +68,7 @@ const FooterConfig = ({ data, setIsEdit, isEdit }: FooterConfigProps) => {
       show_brand_info: false,
       social_media_accounts: [],
       footer_show_intro: true,
+      brand_groups: [],
     },
   });
 
@@ -319,7 +326,7 @@ const FooterConfig = ({ data, setIsEdit, isEdit }: FooterConfigProps) => {
                   }}
                   onClick={() => {
                     const newAccounts = [
-                      ...social_media_accounts,
+                      ...(social_media_accounts || []),
                       {
                         icon: '',
                         channel: '',
@@ -331,8 +338,7 @@ const FooterConfig = ({ data, setIsEdit, isEdit }: FooterConfigProps) => {
                     setIsEdit(true);
                   }}
                 >
-                  <Icon
-                    type='icon-tianjia'
+                  <IconTianjia
                     sx={{ fontSize: '10px !important', color: '#5F58FE' }}
                   />
                   <Box
@@ -348,7 +354,7 @@ const FooterConfig = ({ data, setIsEdit, isEdit }: FooterConfigProps) => {
                 </Stack>
               </Stack>
               <DragSocialInfo
-                data={social_media_accounts}
+                data={social_media_accounts || []}
                 control={control}
                 onChange={(data: DomainSocialMediaAccount[]) => {
                   setValue('social_media_accounts', data);
@@ -389,15 +395,14 @@ const FooterConfig = ({ data, setIsEdit, isEdit }: FooterConfigProps) => {
               }}
               onClick={() => {
                 const newGroups = [
-                  ...brand_groups,
+                  ...(brand_groups || []),
                   { name: '', links: [{ name: '', url: '' }] },
                 ];
                 setValue('brand_groups', newGroups);
                 setIsEdit(true);
               }}
             >
-              <Icon
-                type='icon-tianjia'
+              <IconTianjia
                 sx={{ fontSize: '10px !important', color: '#5F58FE' }}
               />
               <Box
@@ -416,7 +421,7 @@ const FooterConfig = ({ data, setIsEdit, isEdit }: FooterConfigProps) => {
 
           <DragBrand
             control={control}
-            data={brand_groups}
+            data={brand_groups || []}
             onChange={brand_groups => {
               setValue('brand_groups', brand_groups);
               setIsEdit(true);
@@ -530,6 +535,7 @@ const FooterConfig = ({ data, setIsEdit, isEdit }: FooterConfigProps) => {
           </Box>
           <VersionMask
             permission={PROFESSION_VERSION_PERMISSION}
+            wrapperSx={{ px: 2 }}
             sx={{ inset: '-8px 0' }}
           >
             <Controller

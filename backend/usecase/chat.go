@@ -165,6 +165,7 @@ func (u *ChatUsecase) Chat(ctx context.Context, req *domain.ChatRequest) (<-chan
 			AppID:          req.AppID,
 			Role:           schema.User,
 			Content:        req.Message,
+			ImagePaths:     req.ImagePaths,
 			RemoteIP:       req.RemoteIP,
 		}); err != nil {
 			u.logger.Error("failed to save user question to conversation message", log.Error(err))
@@ -218,11 +219,10 @@ func (u *ChatUsecase) Chat(ctx context.Context, req *domain.ChatRequest) (<-chan
 			return
 		}
 
-		// 4. retrieve documents and format prompt
-		messages, rankedNodes, err := u.llmUsecase.FormatConversationMessages(ctx, req.ConversationID, req.KBID, groupIds)
+		messages, rankedNodes, err := u.llmUsecase.BuildConversationMessageWithRAG(ctx, req.ConversationID, req.KBID, groupIds, req.Prompt)
 		if err != nil {
-			u.logger.Error("failed to format chat messages", log.Error(err))
-			eventCh <- domain.SSEEvent{Type: "error", Content: "failed to format chat messages"}
+			u.logger.Error("build messages failed", log.Error(err))
+			eventCh <- domain.SSEEvent{Type: "error", Content: err.Error()}
 			return
 		}
 
@@ -301,6 +301,71 @@ func (u *ChatUsecase) Chat(ctx context.Context, req *domain.ChatRequest) (<-chan
 	return eventCh, nil
 }
 
+func (u *ChatUsecase) ChatRagOnly(ctx context.Context, req *domain.ChatRagOnlyRequest) (<-chan domain.SSEEvent, error) {
+	eventCh := make(chan domain.SSEEvent, 100)
+	go func() {
+		defer close(eventCh)
+
+		// extra1. if user set question block words then check it
+		blockWords, err := u.blockWordRepo.GetBlockWords(ctx, req.KBID)
+		if err != nil {
+			u.logger.Error("failed to get question block words", log.Error(err))
+			eventCh <- domain.SSEEvent{Type: "error", Content: "failed to get question block words"}
+			return
+		}
+		if len(blockWords) > 0 { // check --> filter
+			questionFilter := utils.GetDFA(req.KBID)
+			if err := questionFilter.DFA.Check(req.Message); err != nil { // exist then return err
+				answer := "**您的问题包含敏感词, AI 无法回答您的问题。**"
+				eventCh <- domain.SSEEvent{Type: "error", Content: answer}
+				return
+			}
+		}
+
+		if req.UserInfo.AuthUserID == 0 {
+			auth, _ := u.AuthRepo.GetAuthBySourceType(ctx, req.AppType.ToSourceType())
+			if auth != nil {
+				req.UserInfo.AuthUserID = auth.ID
+			}
+		}
+
+		groupIds, err := u.AuthRepo.GetAuthGroupIdsWithParentsByAuthId(ctx, req.UserInfo.AuthUserID)
+		if err != nil {
+			u.logger.Error("failed to get auth groupIds", log.Error(err))
+			eventCh <- domain.SSEEvent{Type: "error", Content: "failed to get auth groupIds"}
+			return
+		}
+
+		// retrieve documents
+		kb, err := u.kbRepo.GetKnowledgeBaseByID(ctx, req.KBID)
+		if err != nil {
+			u.logger.Error("failed to get kb", log.Error(err))
+			eventCh <- domain.SSEEvent{Type: "error", Content: "failed to get kb"}
+			return
+		}
+		_, rankedNodes, err := u.llmUsecase.GetRankNodes(ctx, GetRankNodesRequest{
+			DatasetID:           kb.DatasetID,
+			Question:            req.Message,
+			GroupIDs:            groupIds,
+			HistoryMessages:     nil,
+			SimilarityThreshold: 0,
+			MaxChunksPerDoc:     1,
+		})
+		if err != nil {
+			u.logger.Error("failed to get rank nodes", log.Error(err))
+			eventCh <- domain.SSEEvent{Type: "error", Content: "failed to get rank nodes"}
+			return
+		}
+		documents := domain.FormatNodeChunks(rankedNodes, kb.AccessSettings.BaseURL)
+		u.logger.Debug("documents", log.String("documents", documents))
+
+		// send only the documents part
+		eventCh <- domain.SSEEvent{Type: "data", Content: documents}
+		eventCh <- domain.SSEEvent{Type: "done"}
+	}()
+	return eventCh, nil
+}
+
 func (u *ChatUsecase) CreateAcOnChunk(ctx context.Context, kbID string, answer *string, eventCh chan<- domain.SSEEvent, blockWords []string) (func(ctx context.Context, dataType, chunk string) error,
 	func(ctx context.Context, dataType string)) {
 	var buffer strings.Builder
@@ -372,7 +437,13 @@ func (u *ChatUsecase) Search(ctx context.Context, req *domain.ChatSearchReq) (*d
 	if err != nil {
 		return nil, err
 	}
-	rankedNodes, err := u.llmUsecase.GetRankNodes(ctx, []string{kb.DatasetID}, req.Message, groupIds, 0.2, nil)
+	_, rankedNodes, err := u.llmUsecase.GetRankNodes(ctx, GetRankNodesRequest{
+		DatasetID:           kb.DatasetID,
+		Question:            req.Message,
+		GroupIDs:            groupIds,
+		SimilarityThreshold: 0.2,
+		HistoryMessages:     nil,
+	})
 	if err != nil {
 		return nil, err
 	}

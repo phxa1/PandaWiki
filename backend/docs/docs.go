@@ -240,7 +240,8 @@ const docTemplate = `{
                             "wechat_service_bot",
                             "discord_bot",
                             "wechat_official_account",
-                            "openai_api"
+                            "openai_api",
+                            "mcp_server"
                         ],
                         "type": "string",
                         "x-enum-varnames": [
@@ -260,7 +261,8 @@ const docTemplate = `{
                             "SourceTypeWechatServiceBot",
                             "SourceTypeDiscordBot",
                             "SourceTypeWechatOfficialAccount",
-                            "SourceTypeOpenAIAPI"
+                            "SourceTypeOpenAIAPI",
+                            "SourceTypeMcpServer"
                         ],
                         "name": "source_type",
                         "in": "query",
@@ -2411,7 +2413,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/domain.ConversationDistribution"
+                                                "$ref": "#/definitions/v1.StatConversationDistributionResp"
                                             }
                                         }
                                     }
@@ -3013,6 +3015,50 @@ const docTemplate = `{
                                     "properties": {
                                         "data": {
                                             "$ref": "#/definitions/domain.AppInfoResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/share/v1/app/wechat/info": {
+            "get": {
+                "description": "WechatAppInfo",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "share_chat"
+                ],
+                "summary": "WechatAppInfo",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "kb id",
+                        "name": "X-KB-ID",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/domain.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/v1.WechatAppInfoResp"
                                         }
                                     }
                                 }
@@ -3694,7 +3740,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/v1.FileUploadResp"
+                                            "$ref": "#/definitions/v1.ShareFileUploadReq"
                                         }
                                     }
                                 }
@@ -4195,44 +4241,32 @@ const docTemplate = `{
         "consts.NodeRagInfoStatus": {
             "type": "string",
             "enum": [
-                "BASIC_PENDING",
-                "BASIC_RUNNING",
-                "BASIC_FAILED",
-                "BASIC_SUCCEEDED",
-                "ENHANCE_PENDING",
-                "ENHANCE_RUNNING",
-                "ENHANCE_FAILED",
-                "ENHANCE_SUCCEEDED"
+                "PENDING",
+                "RUNNING",
+                "FAILED",
+                "SUCCEEDED",
+                "REINDEX"
             ],
             "x-enum-comments": {
-                "NodeRagStatusBasicFailed": "基础处理失败",
-                "NodeRagStatusBasicPending": "等待基础处理",
-                "NodeRagStatusBasicRunning": "正在进行基础处理（文本分割、向量化等）",
-                "NodeRagStatusBasicSucceeded": "基础处理成功",
-                "NodeRagStatusEnhanceFailed": "增强处理失败",
-                "NodeRagStatusEnhancePending": "基础处理完成，等待增强处理",
-                "NodeRagStatusEnhanceRunning": "正在进行增强处理（关键词提取等）",
-                "NodeRagStatusEnhanceSucceeded": "增强处理成功"
+                "NodeRagStatusFailed": "处理失败",
+                "NodeRagStatusPending": "等待处理",
+                "NodeRagStatusReindexing": "重新索引中",
+                "NodeRagStatusRunning": "正在进行处理（文本分割、向量化等）",
+                "NodeRagStatusSucceeded": "处理成功"
             },
             "x-enum-descriptions": [
-                "等待基础处理",
-                "正在进行基础处理（文本分割、向量化等）",
-                "基础处理失败",
-                "基础处理成功",
-                "基础处理完成，等待增强处理",
-                "正在进行增强处理（关键词提取等）",
-                "增强处理失败",
-                "增强处理成功"
+                "等待处理",
+                "正在进行处理（文本分割、向量化等）",
+                "处理失败",
+                "处理成功",
+                "重新索引中"
             ],
             "x-enum-varnames": [
-                "NodeRagStatusBasicPending",
-                "NodeRagStatusBasicRunning",
-                "NodeRagStatusBasicFailed",
-                "NodeRagStatusBasicSucceeded",
-                "NodeRagStatusEnhancePending",
-                "NodeRagStatusEnhanceRunning",
-                "NodeRagStatusEnhanceFailed",
-                "NodeRagStatusEnhanceSucceeded"
+                "NodeRagStatusPending",
+                "NodeRagStatusRunning",
+                "NodeRagStatusFailed",
+                "NodeRagStatusSucceeded",
+                "NodeRagStatusReindexing"
             ]
         },
         "consts.RedeemCaptchaReq": {
@@ -4268,7 +4302,8 @@ const docTemplate = `{
                 "wechat_service_bot",
                 "discord_bot",
                 "wechat_official_account",
-                "openai_api"
+                "openai_api",
+                "mcp_server"
             ],
             "x-enum-varnames": [
                 "SourceTypeDingTalk",
@@ -4287,7 +4322,8 @@ const docTemplate = `{
                 "SourceTypeWechatServiceBot",
                 "SourceTypeDiscordBot",
                 "SourceTypeWechatOfficialAccount",
-                "SourceTypeOpenAIAPI"
+                "SourceTypeOpenAIAPI",
+                "SourceTypeMcpServer"
             ]
         },
         "consts.StatDay": {
@@ -4487,6 +4523,9 @@ const docTemplate = `{
         "domain.AppInfoResp": {
             "type": "object",
             "properties": {
+                "base_url": {
+                    "type": "string"
+                },
                 "name": {
                     "type": "string"
                 },
@@ -4512,9 +4551,6 @@ const docTemplate = `{
                         }
                     ]
                 },
-                "auto_sitemap": {
-                    "type": "boolean"
-                },
                 "body_code": {
                     "type": "string"
                 },
@@ -4532,6 +4568,9 @@ const docTemplate = `{
                 },
                 "contribute_settings": {
                     "$ref": "#/definitions/domain.ContributeSettings"
+                },
+                "conversation_setting": {
+                    "$ref": "#/definitions/domain.ConversationSetting"
                 },
                 "copy_setting": {
                     "enum": [
@@ -4620,6 +4659,14 @@ const docTemplate = `{
                         }
                     ]
                 },
+                "mcp_server_settings": {
+                    "description": "MCP Server Settings",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/domain.MCPServerSettings"
+                        }
+                    ]
+                },
                 "openai_api_bot_settings": {
                     "description": "OpenAI API Bot settings",
                     "allOf": [
@@ -4642,6 +4689,9 @@ const docTemplate = `{
                 },
                 "search_placeholder": {
                     "type": "string"
+                },
+                "stats_setting": {
+                    "$ref": "#/definitions/domain.StatsSetting"
                 },
                 "theme_and_style": {
                     "$ref": "#/definitions/domain.ThemeAndStyle"
@@ -4694,6 +4744,9 @@ const docTemplate = `{
                 },
                 "web_app_landing_theme": {
                     "$ref": "#/definitions/domain.WebAppLandingTheme"
+                },
+                "wechat_app_advanced_setting": {
+                    "$ref": "#/definitions/domain.WeChatAppAdvancedSetting"
                 },
                 "wechat_app_agent_id": {
                     "type": "string"
@@ -4791,9 +4844,6 @@ const docTemplate = `{
                         }
                     ]
                 },
-                "auto_sitemap": {
-                    "type": "boolean"
-                },
                 "body_code": {
                     "type": "string"
                 },
@@ -4811,6 +4861,9 @@ const docTemplate = `{
                 },
                 "contribute_settings": {
                     "$ref": "#/definitions/domain.ContributeSettings"
+                },
+                "conversation_setting": {
+                    "$ref": "#/definitions/domain.ConversationSetting"
                 },
                 "copy_setting": {
                     "$ref": "#/definitions/consts.CopySetting"
@@ -4890,6 +4943,14 @@ const docTemplate = `{
                         }
                     ]
                 },
+                "mcp_server_settings": {
+                    "description": "MCP Server Settings",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/domain.MCPServerSettings"
+                        }
+                    ]
+                },
                 "openai_api_bot_settings": {
                     "description": "OpenAI API settings",
                     "allOf": [
@@ -4912,6 +4973,9 @@ const docTemplate = `{
                 },
                 "search_placeholder": {
                     "type": "string"
+                },
+                "stats_setting": {
+                    "$ref": "#/definitions/domain.StatsSetting"
                 },
                 "theme_and_style": {
                     "$ref": "#/definitions/domain.ThemeAndStyle"
@@ -4955,6 +5019,9 @@ const docTemplate = `{
                 },
                 "web_app_landing_theme": {
                     "$ref": "#/definitions/domain.WebAppLandingTheme"
+                },
+                "wechat_app_advanced_setting": {
+                    "$ref": "#/definitions/domain.WeChatAppAdvancedSetting"
                 },
                 "wechat_app_agent_id": {
                     "type": "string"
@@ -5050,7 +5117,8 @@ const docTemplate = `{
                 8,
                 9,
                 10,
-                11
+                11,
+                12
             ],
             "x-enum-varnames": [
                 "AppTypeWeb",
@@ -5063,7 +5131,8 @@ const docTemplate = `{
                 "AppTypeWechatOfficialAccount",
                 "AppTypeOpenAIAPI",
                 "AppTypeWecomAIBot",
-                "AppTypeLarkBot"
+                "AppTypeLarkBot",
+                "AppTypeMcpServer"
             ]
         },
         "domain.AuthUserInfo": {
@@ -5302,8 +5371,7 @@ const docTemplate = `{
         "domain.ChatRequest": {
             "type": "object",
             "required": [
-                "app_type",
-                "message"
+                "app_type"
             ],
             "properties": {
                 "app_type": {
@@ -5322,6 +5390,13 @@ const docTemplate = `{
                 },
                 "conversation_id": {
                     "type": "string"
+                },
+                "image_paths": {
+                    "type": "array",
+                    "maxItems": 3,
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "message": {
                     "type": "string"
@@ -5560,20 +5635,6 @@ const docTemplate = `{
                 }
             }
         },
-        "domain.ConversationDistribution": {
-            "type": "object",
-            "properties": {
-                "app_id": {
-                    "type": "string"
-                },
-                "app_type": {
-                    "$ref": "#/definitions/domain.AppType"
-                },
-                "count": {
-                    "type": "integer"
-                }
-            }
-        },
         "domain.ConversationInfo": {
             "type": "object",
             "properties": {
@@ -5644,6 +5705,12 @@ const docTemplate = `{
                 },
                 "id": {
                     "type": "string"
+                },
+                "image_paths": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "info": {
                     "description": "feedbackinfo",
@@ -5748,6 +5815,17 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "domain.ConversationSetting": {
+            "type": "object",
+            "properties": {
+                "copyright_hide_enabled": {
+                    "type": "boolean"
+                },
+                "copyright_info": {
                     "type": "string"
                 }
             }
@@ -6361,6 +6439,31 @@ const docTemplate = `{
                 }
             }
         },
+        "domain.MCPServerSettings": {
+            "type": "object",
+            "properties": {
+                "docs_tool_settings": {
+                    "$ref": "#/definitions/domain.MCPToolSettings"
+                },
+                "is_enabled": {
+                    "type": "boolean"
+                },
+                "sample_auth": {
+                    "$ref": "#/definitions/domain.SimpleAuth"
+                }
+            }
+        },
+        "domain.MCPToolSettings": {
+            "type": "object",
+            "properties": {
+                "desc": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
         "domain.MessageContent": {
             "type": "object"
         },
@@ -6581,6 +6684,9 @@ const docTemplate = `{
                 },
                 "position": {
                     "type": "number"
+                },
+                "publisher_id": {
+                    "type": "string"
                 },
                 "rag_info": {
                     "$ref": "#/definitions/domain.RagInfo"
@@ -7189,19 +7295,34 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
+                "image_paths": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "role": {
                     "$ref": "#/definitions/schema.RoleType"
                 }
             }
         },
-        "domain.ShareNodeListItemResp": {
+        "domain.ShareNodeDetailItem": {
             "type": "object",
             "properties": {
+                "children": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/domain.ShareNodeDetailItem"
+                    }
+                },
                 "emoji": {
                     "type": "string"
                 },
                 "id": {
                     "type": "string"
+                },
+                "meta": {
+                    "$ref": "#/definitions/domain.NodeMeta"
                 },
                 "name": {
                     "type": "string"
@@ -7306,6 +7427,14 @@ const docTemplate = `{
                 "StatPageSceneChat",
                 "StatPageSceneLogin"
             ]
+        },
+        "domain.StatsSetting": {
+            "type": "object",
+            "properties": {
+                "pv_enable": {
+                    "type": "boolean"
+                }
+            }
         },
         "domain.SwitchModeReq": {
             "type": "object",
@@ -7545,6 +7674,29 @@ const docTemplate = `{
                 }
             }
         },
+        "domain.WeChatAppAdvancedSetting": {
+            "type": "object",
+            "properties": {
+                "disclaimer_content": {
+                    "type": "string"
+                },
+                "feedback_enable": {
+                    "type": "boolean"
+                },
+                "feedback_type": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "prompt": {
+                    "type": "string"
+                },
+                "text_response_enable": {
+                    "type": "boolean"
+                }
+            }
+        },
         "domain.WebAppCommentSettings": {
             "type": "object",
             "properties": {
@@ -7753,6 +7905,12 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "btn_text": {
+                    "type": "string"
+                },
+                "copyright_hide_enabled": {
+                    "type": "boolean"
+                },
+                "copyright_info": {
                     "type": "string"
                 },
                 "disclaimer": {
@@ -8348,14 +8506,6 @@ const docTemplate = `{
                 }
             }
         },
-        "v1.FileUploadResp": {
-            "type": "object",
-            "properties": {
-                "key": {
-                    "type": "string"
-                }
-            }
-        },
         "v1.KBUserInviteReq": {
             "type": "object",
             "required": [
@@ -8497,6 +8647,9 @@ const docTemplate = `{
                 "publisher_id": {
                     "type": "string"
                 },
+                "pv": {
+                    "type": "integer"
+                },
                 "status": {
                     "$ref": "#/definitions/domain.NodeStatus"
                 },
@@ -8623,6 +8776,20 @@ const docTemplate = `{
                 }
             }
         },
+        "v1.ShareFileUploadReq": {
+            "type": "object",
+            "required": [
+                "captcha_token"
+            ],
+            "properties": {
+                "captcha_token": {
+                    "type": "string"
+                },
+                "file": {
+                    "type": "string"
+                }
+            }
+        },
         "v1.ShareNodeDetailResp": {
             "type": "object",
             "properties": {
@@ -8653,7 +8820,7 @@ const docTemplate = `{
                 "list": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/domain.ShareNodeListItemResp"
+                        "$ref": "#/definitions/domain.ShareNodeDetailItem"
                     }
                 },
                 "meta": {
@@ -8674,6 +8841,9 @@ const docTemplate = `{
                 "publisher_id": {
                     "type": "string"
                 },
+                "pv": {
+                    "type": "integer"
+                },
                 "status": {
                     "$ref": "#/definitions/domain.NodeStatus"
                 },
@@ -8682,6 +8852,17 @@ const docTemplate = `{
                 },
                 "updated_at": {
                     "type": "string"
+                }
+            }
+        },
+        "v1.StatConversationDistributionResp": {
+            "type": "object",
+            "properties": {
+                "app_type": {
+                    "$ref": "#/definitions/domain.AppType"
+                },
+                "count": {
+                    "type": "integer"
                 }
             }
         },
@@ -8753,6 +8934,26 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/v1.UserListItemResp"
                     }
+                }
+            }
+        },
+        "v1.WechatAppInfoResp": {
+            "type": "object",
+            "properties": {
+                "disclaimer_content": {
+                    "type": "string"
+                },
+                "feedback_enable": {
+                    "type": "boolean"
+                },
+                "feedback_type": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "wechat_app_is_enabled": {
+                    "type": "boolean"
                 }
             }
         }

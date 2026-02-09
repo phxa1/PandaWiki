@@ -4,12 +4,12 @@ import Logo from '@/assets/images/logo.png';
 import { ChunkResultItem } from '@/assets/type';
 import Feedback from '@/components/feedback';
 import {
-  IconCai,
-  IconCaied,
-  IconCopy,
-  IconZan,
-  IconZaned,
-} from '@/components/icons';
+  IconADiancaiWeixuanzhong2,
+  IconDiancaiWeixuanzhong,
+  IconDianzanXuanzhong1,
+  IconDianzanWeixuanzhong,
+} from '@panda-wiki/icons';
+import { IconCopy } from '@/components/icons';
 import MarkDown2 from '@/components/markdown2';
 import { useSmartScroll } from '@/hooks';
 import { useStore } from '@/provider';
@@ -73,6 +73,8 @@ import {
   StyledUserBubble,
 } from './StyledComponents';
 import { handleThinkingContent } from './utils';
+import { useBasePath } from '@/hooks';
+import { getImagePath } from '@/utils/getImagePath';
 
 export interface ConversationItem {
   q: string;
@@ -375,9 +377,9 @@ const AiQaContent: React.FC<{
 
     let token = '';
 
-    const Cap = (await import('@cap.js/widget')).default;
+    const Cap = (await import(`@cap.js/widget`)).default;
     const cap = new Cap({
-      apiEndpoint: '/share/v1/captcha/',
+      apiEndpoint: `${basePath}/share/v1/captcha/`,
     });
     try {
       const solution = await cap.solve();
@@ -492,9 +494,8 @@ const AiQaContent: React.FC<{
   };
 
   useEffect(() => {
-    // @ts-ignore
     window.CAP_CUSTOM_WASM_URL =
-      window.location.origin + '/cap@0.0.6/cap_wasm.min.js';
+      window.location.origin + `${basePath}/cap@0.0.6/cap_wasm.min.js`;
   }, []);
 
   const onSearch = (q: string, reset: boolean = false) => {
@@ -529,7 +530,7 @@ const AiQaContent: React.FC<{
   };
 
   const { mobile = false, kbDetail } = useStore();
-
+  const basePath = useBasePath();
   const isFeedbackEnabled =
     // @ts-ignore
     kbDetail?.settings?.ai_feedback_settings?.is_enabled ?? true;
@@ -558,7 +559,7 @@ const AiQaContent: React.FC<{
 
   useEffect(() => {
     sseClientRef.current = new SSEClient({
-      url: `/share/v1/chat/widget`,
+      url: `${basePath}/share/v1/chat/widget`,
       headers: {
         'Content-Type': 'application/json',
       },
@@ -695,7 +696,7 @@ const AiQaContent: React.FC<{
           {/* Logo区域 */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, my: 8 }}>
             <Image
-              src={kbDetail?.settings?.icon || Logo.src}
+              src={getImagePath(kbDetail?.settings?.icon || Logo.src, basePath)}
               alt='logo'
               width={46}
               height={46}
@@ -819,7 +820,10 @@ const AiQaContent: React.FC<{
                                 color: alpha(theme.palette.text.primary, 0.5),
                               })}
                               onClick={() => {
-                                window.open(`/node/${chunk.node_id}`, '_blank');
+                                window.open(
+                                  `${basePath}/node/${chunk.node_id}`,
+                                  '_blank',
+                                );
                               }}
                             >
                               {chunk.name}
@@ -902,10 +906,10 @@ const AiQaContent: React.FC<{
                       {isFeedbackEnabled && item.source === 'chat' && (
                         <>
                           {item.score === 1 && (
-                            <IconZaned sx={{ cursor: 'pointer' }} />
+                            <IconDianzanXuanzhong1 sx={{ cursor: 'pointer' }} />
                           )}
                           {item.score !== 1 && (
-                            <IconZan
+                            <IconDianzanWeixuanzhong
                               sx={{ cursor: 'pointer' }}
                               onClick={() => {
                                 if (item.score === 0)
@@ -914,7 +918,7 @@ const AiQaContent: React.FC<{
                             />
                           )}
                           {item.score !== -1 && (
-                            <IconCai
+                            <IconDiancaiWeixuanzhong
                               sx={{ cursor: 'pointer' }}
                               onClick={() => {
                                 if (item.score === 0) {
@@ -925,13 +929,16 @@ const AiQaContent: React.FC<{
                             />
                           )}
                           {item.score === -1 && (
-                            <IconCaied sx={{ cursor: 'pointer' }} />
+                            <IconADiancaiWeixuanzhong2
+                              sx={{ cursor: 'pointer' }}
+                            />
                           )}
                         </>
                       )}
                     </Stack>
                     <Box>
-                      {widget?.settings?.widget_bot_settings?.disclaimer}
+                      {widget?.settings?.widget_bot_settings?.disclaimer ||
+                        '本回答由 PandaWiki AI 自动生成，仅供参考。'}
                     </Box>
                   </StyledActionStack>
                 )}

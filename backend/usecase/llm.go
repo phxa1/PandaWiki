@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"slices"
@@ -57,18 +58,20 @@ func NewLLMUsecase(config *config.Config, rag rag.RAGService, conversationRepo *
 	}
 }
 
-func (u *LLMUsecase) FormatConversationMessages(
+func (u *LLMUsecase) BuildConversationMessageWithRAG(
 	ctx context.Context,
 	conversationID string,
 	kbID string,
 	groupIDs []int,
+	systemPrompt string,
 ) ([]*schema.Message, []*domain.RankedNodeChunks, error) {
 	messages := make([]*schema.Message, 0)
 	rankedNodes := make([]*domain.RankedNodeChunks, 0)
 
 	msgs, err := u.conversationRepo.GetConversationMessagesByID(ctx, conversationID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("get conversation messages failed: %w", err)
+		u.logger.Error("get conversation messages failed", log.Error(err))
+		return nil, nil, errors.New("get conversation messages failed")
 	}
 	if len(msgs) > 0 {
 		historyMessages := make([]*schema.Message, 0)
@@ -77,20 +80,24 @@ func (u *LLMUsecase) FormatConversationMessages(
 			case schema.Assistant:
 				historyMessages = append(historyMessages, schema.AssistantMessage(msg.Content, nil))
 			case schema.User:
-				historyMessages = append(historyMessages, schema.UserMessage(msg.Content))
+				content := u.formatMessageWithImages(msg.Content, msg.ImagePaths)
+				historyMessages = append(historyMessages, schema.UserMessage(content))
 			default:
 				continue
 			}
 		}
 		if len(historyMessages) > 0 {
 			question := historyMessages[len(historyMessages)-1].Content
-
-			systemPrompt := domain.SystemPrompt
-			if prompt, err := u.promptRepo.GetPrompt(ctx, kbID); err != nil {
-				u.logger.Error("get prompt from settings failed", log.Error(err))
-			} else {
-				if prompt != "" {
-					systemPrompt = prompt
+			var rewrittenQuery string
+			if systemPrompt == "" {
+				if settingPrompt, err := u.promptRepo.GetPrompt(ctx, kbID); err != nil {
+					u.logger.Error("get prompt from settings failed", log.Error(err))
+				} else {
+					if settingPrompt != "" {
+						systemPrompt = settingPrompt
+					} else {
+						systemPrompt = domain.SystemDefaultPrompt
+					}
 				}
 			}
 
@@ -100,22 +107,31 @@ func (u *LLMUsecase) FormatConversationMessages(
 			)
 			kb, err := u.kbRepo.GetKnowledgeBaseByID(ctx, kbID)
 			if err != nil {
-				return nil, nil, fmt.Errorf("get kb failed: %w", err)
+				u.logger.Error("get kb failed", log.Error(err))
+				return nil, nil, errors.New("get kb failed")
 			}
-			rankedNodes, err = u.GetRankNodes(ctx, []string{kb.DatasetID}, question, groupIDs, 0, historyMessages[:len(historyMessages)-1])
+			rewrittenQuery, rankedNodes, err = u.GetRankNodes(ctx, GetRankNodesRequest{
+				DatasetID:           kb.DatasetID,
+				Question:            question,
+				GroupIDs:            groupIDs,
+				SimilarityThreshold: 0.2,
+				HistoryMessages:     historyMessages[:len(historyMessages)-1],
+			})
 			if err != nil {
-				return nil, nil, fmt.Errorf("get rank nodes failed: %w", err)
+				u.logger.Error("get rank nodes failed", log.Error(err))
+				return nil, nil, errors.New("get rank nodes failed")
 			}
 			documents := domain.FormatNodeChunks(rankedNodes, kb.AccessSettings.BaseURL)
 			u.logger.Debug("documents", log.String("documents", documents))
 
 			formattedMessages, err := template.Format(ctx, map[string]any{
 				"CurrentDate": time.Now().Format("2006-01-02"),
-				"Question":    question,
+				"Question":    rewrittenQuery,
 				"Documents":   documents,
 			})
 			if err != nil {
-				return nil, nil, fmt.Errorf("format messages failed: %w", err)
+				u.logger.Error("format messages failed", log.Error(err))
+				return nil, nil, errors.New("format messages failed")
 			}
 			messages = slices.Insert(formattedMessages, 1, historyMessages[:len(historyMessages)-1]...)
 		}
@@ -299,19 +315,28 @@ func (u *LLMUsecase) SplitByTokenLimit(text string, maxTokens int) ([]string, er
 	return result, nil
 }
 
-func (u *LLMUsecase) GetRankNodes(
-	ctx context.Context,
-	datasetIDs []string,
-	question string,
-	groupIDs []int,
-	similarityThreshold float64,
-	historyMessages []*schema.Message,
-) ([]*domain.RankedNodeChunks, error) {
+type GetRankNodesRequest struct {
+	DatasetID           string
+	Question            string
+	GroupIDs            []int
+	SimilarityThreshold float64
+	HistoryMessages     []*schema.Message
+	MaxChunksPerDoc     int
+}
+
+func (u *LLMUsecase) GetRankNodes(ctx context.Context, req GetRankNodesRequest) (string, []*domain.RankedNodeChunks, error) {
 	var rankedNodes []*domain.RankedNodeChunks
 	// get related documents from raglite
-	records, err := u.rag.QueryRecords(ctx, datasetIDs, question, groupIDs, similarityThreshold, historyMessages)
+	rewrittenQuery, records, err := u.rag.QueryRecords(ctx, &rag.QueryRecordsRequest{
+		DatasetID:           req.DatasetID,
+		Query:               req.Question,
+		GroupIDs:            req.GroupIDs,
+		SimilarityThreshold: req.SimilarityThreshold,
+		HistoryMsgs:         req.HistoryMessages,
+		MaxChunksPerDoc:     req.MaxChunksPerDoc,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("get records from raglite failed: %w", err)
+		return "", nil, fmt.Errorf("get records from raglite failed: %w", err)
 	}
 	u.logger.Info("get related documents from raglite", log.Any("record_count", len(records)))
 	rankedNodesMap := make(map[string]*domain.RankedNodeChunks)
@@ -323,7 +348,7 @@ func (u *LLMUsecase) GetRankNodes(
 		u.logger.Info("node chunk doc ids", log.Any("docIDs", docIDs))
 		docIDNode, err := u.nodeRepo.GetNodeReleasesWithPathsByDocIDs(ctx, docIDs)
 		if err != nil {
-			return nil, fmt.Errorf("get nodes by ids failed: %w", err)
+			return "", nil, fmt.Errorf("get nodes by ids failed: %w", err)
 		}
 		u.logger.Info("get node release by doc ids", log.Any("docIDNode", lo.Keys(docIDNode)))
 		for _, record := range records {
@@ -345,5 +370,19 @@ func (u *LLMUsecase) GetRankNodes(
 			}
 		}
 	}
-	return rankedNodes, nil
+	return rewrittenQuery, rankedNodes, nil
+}
+
+// formatMessageWithImages converts image paths to markdown format and appends to message
+func (u *LLMUsecase) formatMessageWithImages(message string, imagePaths []string) string {
+	if len(imagePaths) == 0 {
+		return message
+	}
+	var builder strings.Builder
+	builder.WriteString(message)
+	for _, path := range imagePaths {
+		builder.WriteString("\n")
+		builder.WriteString(fmt.Sprintf("![](%s)", path))
+	}
+	return builder.String()
 }

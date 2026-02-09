@@ -42,12 +42,14 @@ interface HeaderProps {
   btns?: NavBtn[];
   children?: React.ReactNode;
   onQaClick?: () => void;
+  homePath?: string;
 }
 const Header = React.memo(
   ({
     isDocPage = false,
     mobile = false,
     docWidth = 'full',
+    homePath = '/',
     catalogWidth = 0,
     logo = '',
     placeholder = '搜索',
@@ -105,6 +107,7 @@ const Header = React.memo(
           left: 0,
           right: 0,
           height: 64,
+          flexShrink: 0,
           bgcolor: 'background.default',
           borderBottom: '1px solid',
           borderColor: 'divider',
@@ -123,6 +126,7 @@ const Header = React.memo(
           sx={{
             position: 'relative',
             width: '100%',
+            minWidth: 0,
             // ...(isDocPage &&
             //   !mobile &&
             //   docWidth !== 'full' && {
@@ -130,20 +134,28 @@ const Header = React.memo(
             //   }),
           }}
         >
-          <Link href={'/'}>
+          <Link href={homePath} sx={{ flex: 1, minWidth: 0 }}>
             <Stack
               direction='row'
               alignItems='center'
               gap={1.5}
               sx={{
-                py: '20px',
                 cursor: 'pointer',
                 color: 'text.primary',
                 '&:hover': { color: 'primary.main' },
               }}
             >
-              <img src={logo} alt='logo' width={36} />
-              <Box sx={{ fontSize: 20 }}>{title}</Box>
+              {logo && <img src={logo} alt='logo' height={36} />}
+              <Box
+                sx={{
+                  fontSize: 20,
+                  whiteSpace: 'nowrap',
+                  textOverflow: 'ellipsis',
+                  overflow: 'hidden',
+                }}
+              >
+                {title}
+              </Box>
             </Stack>
           </Link>
           {showSearch &&
@@ -153,7 +165,6 @@ const Header = React.memo(
                 direction='row'
                 alignItems='center'
                 justifyContent='flex-end'
-                sx={{ flex: 1 }}
               >
                 <IconButton
                   size='small'
@@ -171,11 +182,9 @@ const Header = React.memo(
                 focused={false}
                 onClick={() => onQaClick?.()}
                 sx={{
-                  position: 'absolute',
-                  left: '50%',
-                  top: '50%',
-                  transform: 'translate(-50%, -50%)',
+                  flex: 1,
                   maxWidth: '500px',
+                  minWidth: '220px',
                   bgcolor: 'background.paper3',
                   borderRadius: '10px',
                   overflow: 'hidden',
@@ -273,7 +282,13 @@ const Header = React.memo(
             ))}
 
           {!mobile && btns && btns.length > 0 && (
-            <Stack direction='row' gap={2} alignItems='center'>
+            <Stack
+              direction='row'
+              gap={2}
+              alignItems='center'
+              justifyContent='flex-end'
+              sx={{ flex: 1 }}
+            >
               {btns.slice(0, Math.min(2, btns.length)).map((item, index) => (
                 <Link key={index} href={item.url} target={item.target}>
                   <Button
@@ -290,6 +305,7 @@ const Header = React.memo(
                     }
                     sx={theme => ({
                       px: 3.5,
+                      whiteSpace: 'nowrap',
                       textTransform: 'none',
                       boxSizing: 'border-box',
                       height: 40,
@@ -379,7 +395,14 @@ const Header = React.memo(
               )}
             </Stack>
           )}
-          {mobile && <NavBtns logo={logo} title={title} btns={btns} />}
+          {mobile && (
+            <NavBtns
+              logo={logo}
+              title={title}
+              btns={btns}
+              homePath={homePath}
+            />
+          )}
         </Stack>
         {children}
       </Stack>

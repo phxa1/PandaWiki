@@ -92,18 +92,33 @@ export const getShortcutKeyText = (shortcutKey: string[]) => {
     .join('+');
 };
 
-export const copyText = (text: string, callback?: () => void) => {
+export const copyText = (
+  text: string,
+  callback?: () => void,
+  duration?: number,
+  msgText?: string,
+) => {
   const isNotHttps = !/^https:\/\//.test(window.location.origin);
+  const dur = duration ?? 1.5;
+
+  if (msgText) {
+    msgText = ` ` + msgText;
+  } else {
+    msgText = '';
+  }
 
   if (isNotHttps) {
-    message.error('非 https 协议下不支持复制，请使用 https 协议');
+    message.error(
+      '非 https 协议下不支持复制，请使用 https 协议' + msgText,
+      dur,
+    );
     return;
   }
 
   try {
     if (navigator.clipboard && window.isSecureContext) {
       navigator.clipboard.writeText(text);
-      message.success('复制成功');
+      message.success('复制成功' + msgText, dur);
       callback?.();
     } else {
       const textArea = document.createElement('textarea');
@@ -118,25 +133,25 @@ export const copyText = (text: string, callback?: () => void) => {
       try {
         const successful = document.execCommand('copy');
         if (successful) {
-          message.success('复制成功');
+          message.success('复制成功' + msgText, duration ?? 1500);
           callback?.();
         } else {
-          message.error('复制失败，请手动复制');
+          message.error('复制失败，请手动复制' + msgText, duration ?? 1500);
         }
       } catch (err) {
-        message.error('复制失败，请手动复制');
+        message.error('复制失败，请手动复制' + msgText, duration ?? 1500);
       }
       document.body.removeChild(textArea);
     }
   } catch (err) {
-    message.error('复制失败，请手动复制');
+    message.error('复制失败，请手动复制' + msgText, duration ?? 1500);
   }
 };
 
 export const validateUrl = (url: string): boolean => {
   try {
     const pattern =
-      /^(https?):\/\/(([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}|(\d{1,3}\.){3}\d{1,3}|\[[a-fA-F0-9:]+\])(:\d+)?$/;
+      /^(https?):\/\/(([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}|(\d{1,3}\.){3}\d{1,3}|\[[a-fA-F0-9:]+\])(:\d+)?(\/[^\s?#]*)?$/;
     if (!pattern.test(url)) return false;
 
     const parsed = new URL(url);

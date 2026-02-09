@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"strings"
 
 	"github.com/gomarkdown/markdown"
 	"github.com/gomarkdown/markdown/html"
@@ -86,6 +85,21 @@ func (u *NodeUsecase) GetList(ctx context.Context, req *domain.GetNodeListReq) (
 	if err != nil {
 		return nil, err
 	}
+	if len(nodes) == 0 {
+		return nodes, nil
+	}
+
+	publisherMap, err := u.nodeRepo.GetNodeReleasePublisherMap(ctx, req.KBID)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, node := range nodes {
+		if publisherID, exists := publisherMap[node.ID]; exists {
+			node.PublisherId = publisherID
+		}
+	}
+
 	return nodes, nil
 }
 
@@ -103,6 +117,12 @@ func (u *NodeUsecase) GetNodeByKBID(ctx context.Context, id, kbId, format string
 		node.PublisherId = nodeRelease.PublisherId
 		node.PublisherAccount = nodeRelease.PublisherAccount
 	}
+
+	nodeStat, err := u.nodeRepo.GetNodeStatsByNodeId(ctx, node.ID)
+	if err != nil {
+		return nil, err
+	}
+	node.PV = nodeStat.PV
 
 	if node.Meta.ContentType == domain.ContentTypeMD {
 		return node, nil
@@ -204,6 +224,21 @@ func (u *NodeUsecase) GetNodeReleaseDetailByKBIDAndID(ctx context.Context, kbID,
 	}
 	if account, ok := userMap[node.PublisherId]; ok {
 		node.PublisherAccount = account
+	}
+
+	if domain.GetBaseEditionLimitation(ctx).AllowNodeStats {
+		webApp, err := u.appRepo.GetOrCreateAppByKBIDAndType(ctx, kbID, domain.AppTypeWeb)
+		if err != nil {
+			return nil, err
+		}
+
+		if webApp.Settings.StatsSetting.PVEnable {
+			nodeStat, err := u.nodeRepo.GetNodeStatsByNodeId(ctx, nodeId)
+			if err != nil {
+				return nil, err
+			}
+			node.PV = nodeStat.PV
+		}
 	}
 
 	if node.Meta.ContentType == domain.ContentTypeMD {
@@ -350,7 +385,7 @@ func (u *NodeUsecase) GetNodeReleaseListByKBID(ctx context.Context, kbID string,
 	return items, nil
 }
 
-func (u *NodeUsecase) GetNodeReleaseListByParentID(ctx context.Context, kbID, parentID string, authId uint) ([]*domain.ShareNodeListItemResp, error) {
+func (u *NodeUsecase) GetNodeReleaseListByParentID(ctx context.Context, kbID, parentID string, authId uint) ([]*domain.ShareNodeDetailItem, error) {
 	// 一次性查询所有节点
 	allNodes, err := u.nodeRepo.GetNodeReleaseListByKBID(ctx, kbID)
 	if err != nil {
@@ -381,23 +416,42 @@ func (u *NodeUsecase) GetNodeReleaseListByParentID(ctx context.Context, kbID, pa
 		childrenMap[node.ParentID] = append(childrenMap[node.ParentID], node)
 	}
 
-	// 递归收集所有后代节点
-	result := make([]*domain.ShareNodeListItemResp, 0)
-	u.collectDescendants(parentID, childrenMap, &result)
+	// 构建树结构
+	result := u.buildNodeTree(parentID, childrenMap)
 
 	return result, nil
 }
 
-// collectDescendants 递归收集所有后代节点
-func (u *NodeUsecase) collectDescendants(parentID string, childrenMap map[string][]*domain.ShareNodeListItemResp, result *[]*domain.ShareNodeListItemResp) {
+// buildNodeTree 递归构建节点树结构
+func (u *NodeUsecase) buildNodeTree(parentID string, childrenMap map[string][]*domain.ShareNodeListItemResp) []*domain.ShareNodeDetailItem {
 	children := childrenMap[parentID]
+	result := make([]*domain.ShareNodeDetailItem, 0, len(children))
+
 	for _, child := range children {
-		*result = append(*result, child)
-		// 如果是文件夹，递归收集其子节点
-		if child.Type == domain.NodeTypeFolder {
-			u.collectDescendants(child.ID, childrenMap, result)
+		node := &domain.ShareNodeDetailItem{
+			ID:        child.ID,
+			Name:      child.Name,
+			Type:      child.Type,
+			ParentID:  child.ParentID,
+			Position:  child.Position,
+			Meta:      child.Meta,
+			Emoji:     child.Emoji,
+			UpdatedAt: child.UpdatedAt,
+			Children:  make([]*domain.ShareNodeDetailItem, 0),
 		}
+
+		// 如果是文件夹，递归构建其子节点
+		if child.Type == domain.NodeTypeFolder {
+			childNodes := u.buildNodeTree(child.ID, childrenMap)
+			if len(childNodes) > 0 {
+				node.Children = append(node.Children, childNodes...)
+			}
+		}
+
+		result = append(result, node)
 	}
+
+	return result
 }
 
 func (u *NodeUsecase) GetNodeIdsByAuthId(ctx context.Context, authId uint, PermName consts.NodePermName) ([]string, error) {
@@ -555,9 +609,7 @@ func (u *NodeUsecase) SyncRagNodeStatus(ctx context.Context) error {
 
 		chunks := lo.Chunk(docIds, ragSyncChunkSize)
 		for _, chunk := range chunks {
-			docs, err := u.rAGService.ListDocuments(ctx, kb.DatasetID, map[string]string{
-				"ids": strings.Join(chunk, ","),
-			})
+			docs, err := u.rAGService.ListDocuments(ctx, kb.DatasetID, chunk)
 			if err != nil {
 				u.logger.Error("list documents from RAG failed",
 					log.String("kb_id", kb.ID),

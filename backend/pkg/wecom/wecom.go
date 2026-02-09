@@ -111,10 +111,12 @@ type UserListResponse struct {
 	} `json:"userlist"`
 }
 
-func NewClient(ctx context.Context, logger *log.Logger, corpID, corpSecret, agentID, redirectURI string, cache *cache.Cache, isApp bool) (*Client, error) {
-	redirectURL, _ := url.Parse(redirectURI)
-	redirectURL.Path = callbackPath
-	redirectURI = redirectURL.String()
+func NewClient(ctx context.Context, logger *log.Logger, corpID, corpSecret, agentID, baseUrl string, cache *cache.Cache, isApp bool) (*Client, error) {
+	redirectURI, err := url.JoinPath(baseUrl, callbackPath)
+	if err != nil {
+		return nil, err
+	}
+
 	authUrl := AuthWebURL
 	if isApp {
 		authUrl = AuthAPPURL

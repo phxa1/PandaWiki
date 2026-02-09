@@ -8,7 +8,7 @@ import {
 } from '@/request/pro';
 import { useAppSelector } from '@/store';
 import { Editor, useTiptap } from '@ctzhian/tiptap';
-import { Ellipsis, Icon } from '@ctzhian/ui';
+import { Ellipsis } from '@ctzhian/ui';
 import {
   alpha,
   Box,
@@ -22,6 +22,14 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { WrapContext } from '..';
 import VersionRollback from '../../component/VersionRollback';
+import {
+  IconMuluzhankai,
+  IconChahao,
+  IconTianjiawendang,
+  IconZiti,
+  IconFabu,
+  IconAShijian2,
+} from '@panda-wiki/icons';
 
 const History = () => {
   const { id = '' } = useParams();
@@ -45,6 +53,7 @@ const History = () => {
   const editorRef = useTiptap({
     content: '',
     editable: false,
+    baseUrl: window.__BASENAME__ || '',
     immediatelyRender: true,
     onUpdate: ({ editor }) => {
       setCharacterCount((editor.storage as any).characterCount.characters());
@@ -55,6 +64,7 @@ const History = () => {
     content: '',
     contentType: 'markdown',
     editable: false,
+    baseUrl: window.__BASENAME__ || '',
     immediatelyRender: true,
     onUpdate: ({ editor }) => {
       setCharacterCount((editor.storage as any).characterCount.characters());
@@ -128,8 +138,7 @@ const History = () => {
               },
             }}
           >
-            <Icon
-              type='icon-muluzhankai'
+            <IconMuluzhankai
               sx={{
                 fontSize: 24,
               }}
@@ -144,7 +153,7 @@ const History = () => {
             navigate(`/doc/editor/${id}`);
           }}
         >
-          <Icon type='icon-chahao' />
+          <IconChahao sx={{ fontSize: 16 }} />
         </IconButton>
       </Stack>
       <Box sx={{ mt: '56px', mr: '292px' }}>
@@ -211,17 +220,17 @@ const History = () => {
                     gap={0.5}
                     sx={{ cursor: 'pointer' }}
                   >
-                    <Icon type='icon-tianjiawendang' sx={{ fontSize: 9 }} />
+                    <IconTianjiawendang sx={{ fontSize: 9 }} />
                     {curNode.editor_account} 编辑
                   </Stack>
                 </Tooltip>
               )}
               <Stack direction={'row'} alignItems={'center'} gap={0.5}>
-                <Icon type='icon-a-shijian2' />
+                <IconAShijian2 sx={{ fontSize: 12 }} />
                 {curVersion?.release_message}
               </Stack>
               <Stack direction={'row'} alignItems={'center'} gap={0.5}>
-                <Icon type='icon-ziti' />
+                <IconZiti sx={{ fontSize: 12 }} />
                 {characterCount} 字
               </Stack>
             </Stack>
@@ -338,7 +347,7 @@ const History = () => {
                       lineHeight: 1,
                     }}
                   >
-                    <Icon type='icon-fabu' />
+                    <IconFabu sx={{ fontSize: 16 }} />
                     {item.publisher_account}
                   </Stack>
                 ) : (

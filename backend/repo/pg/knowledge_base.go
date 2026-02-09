@@ -169,7 +169,7 @@ func (r *KnowledgeBaseRepository) SyncKBAccessSettingsToCaddy(ctx context.Contex
 							{
 								"match": []map[string]any{
 									{
-										"path": []string{"/share/v1/chat/completions", "/share/v1/app/wechat/app", "/share/v1/app/wechat/service", "/sitemap.xml", "/share/v1/app/wechat/official_account", "/share/v1/app/wechat/service/answer"},
+										"path": []string{"/share/v1/chat/completions", "/share/v1/app/wechat/app", "/share/v1/app/wechat/service", "/sitemap.xml", "/share/v1/app/wechat/official_account", "/share/v1/app/wechat/service/answer", "/mcp"},
 									},
 								},
 								"handle": []map[string]any{
@@ -341,12 +341,11 @@ func (r *KnowledgeBaseRepository) CreateKnowledgeBase(ctx context.Context, maxKB
 			Name: kb.Name,
 			Type: domain.AppTypeWeb,
 			Settings: domain.AppSettings{
-				Title:       kb.Name,
-				Desc:        kb.Name,
-				Keyword:     kb.Name,
-				AutoSitemap: true,
-				Icon:        domain.DefaultPandaWikiIconB64,
-				WelcomeStr:  fmt.Sprintf("欢迎使用%s", kb.Name),
+				Title:      kb.Name,
+				Desc:       kb.Name,
+				Keyword:    kb.Name,
+				Icon:       domain.DefaultPandaWikiIconB64,
+				WelcomeStr: fmt.Sprintf("欢迎使用%s", kb.Name),
 				Btns: []any{
 					AppBtn{
 						ID:       uuid.New().String(),
@@ -615,7 +614,7 @@ func (r *KnowledgeBaseRepository) CreateKBRelease(ctx context.Context, release *
 				CreatedAt:     time.Now(),
 			}
 		}
-		if err := tx.CreateInBatches(&kbReleaseNodeReleases, 100).Error; err != nil {
+		if err := tx.CreateInBatches(&kbReleaseNodeReleases, 2000).Error; err != nil {
 			return err
 		}
 		return nil
@@ -625,16 +624,18 @@ func (r *KnowledgeBaseRepository) CreateKBRelease(ctx context.Context, release *
 	return nil
 }
 
-func (r *KnowledgeBaseRepository) GetKBReleaseList(ctx context.Context, kbID string) (int64, []domain.KBReleaseListItemResp, error) {
+func (r *KnowledgeBaseRepository) GetKBReleaseList(ctx context.Context, kbID string, offset, limit int) (int64, []domain.KBReleaseListItemResp, error) {
 	var total int64
 	if err := r.db.Model(&domain.KBRelease{}).Where("kb_id = ?", kbID).Count(&total).Error; err != nil {
 		return 0, nil, err
 	}
 
 	var releases []domain.KBReleaseListItemResp
-	if err := r.db.Model(&domain.KBRelease{}).
+	if err := r.db.WithContext(ctx).Model(&domain.KBRelease{}).
 		Where("kb_id = ?", kbID).
 		Order("created_at DESC").
+		Offset(offset).
+		Limit(limit).
 		Find(&releases).Error; err != nil {
 		return 0, nil, err
 	}

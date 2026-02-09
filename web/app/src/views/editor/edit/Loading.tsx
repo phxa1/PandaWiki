@@ -1,11 +1,12 @@
 'use client';
 import { V1NodeDetailResp } from '@/request/types';
 import { useTiptap } from '@ctzhian/tiptap';
-import { Icon } from '@ctzhian/ui';
+import { useBasePath } from '@/hooks/useBasePath';
 import { Box, Skeleton, Stack } from '@mui/material';
 import { useState } from 'react';
 import Header from './Header';
 import Toolbar from './Toolbar';
+import { IconAShijian2, IconZiti } from '@panda-wiki/icons';
 
 const LoadingEditorWrap = () => {
   const [isSyncing] = useState(false);
@@ -16,12 +17,13 @@ const LoadingEditorWrap = () => {
       color: string;
     }>
   >([]);
-
+  const baseUrl = useBasePath();
   const editorRef = useTiptap({
     editable: false,
     content: '',
     exclude: ['invisibleCharacters', 'youtube', 'mention'],
     immediatelyRender: false,
+    baseUrl: baseUrl,
   });
 
   return (
@@ -55,11 +57,11 @@ const LoadingEditorWrap = () => {
           </Stack>
           <Stack direction={'row'} alignItems={'center'} gap={2} sx={{ mb: 4 }}>
             <Stack direction={'row'} alignItems={'center'} gap={0.5}>
-              <Icon type='icon-a-shijian2' sx={{ color: 'text.tertiary' }} />
+              <IconAShijian2 sx={{ color: 'text.tertiary' }} />
               <Skeleton variant='text' width={130} height={24} />
             </Stack>
             <Stack direction={'row'} alignItems={'center'} gap={0.5}>
-              <Icon type='icon-ziti' sx={{ color: 'text.tertiary' }} />
+              <IconZiti sx={{ color: 'text.tertiary' }} />
               <Skeleton variant='text' width={80} height={24} />
             </Stack>
           </Stack>

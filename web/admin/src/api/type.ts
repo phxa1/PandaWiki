@@ -323,7 +323,6 @@ export type WelcomeSetting = {
 export type SEOSetting = {
   keyword: string;
   desc: string;
-  auto_sitemap: boolean;
 };
 
 export type CustomCodeSetting = {
@@ -587,6 +586,7 @@ export type ChatConversationItem = {
 
 export type ChatConversationPair = {
   user: string;
+  image_paths: string[];
   assistant: string;
   thinking_content: string;
   created_at: string;

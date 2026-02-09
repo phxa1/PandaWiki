@@ -1,6 +1,8 @@
 import { FreeSoloAutocomplete } from '@/components/FreeSoloAutocomplete';
 import ShowText from '@/components/ShowText';
 import UploadFile from '@/components/UploadFile';
+import VersionMask from '@/components/VersionMask';
+import { PROFESSION_VERSION_PERMISSION } from '@/constant/version';
 import { useCommitPendingInput } from '@/hooks';
 import { getApiV1AppDetail, putApiV1App } from '@/request/App';
 import {
@@ -8,7 +10,8 @@ import {
   DomainKnowledgeBaseDetail,
 } from '@/request/types';
 import { useAppSelector } from '@/store';
-import { Icon, message } from '@ctzhian/ui';
+import { message } from '@ctzhian/ui';
+import { IconJinggao } from '@panda-wiki/icons';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import {
   Box,
@@ -24,7 +27,6 @@ import {
 import { useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { FormItem, SettingCardItem } from '../../Common';
-import RecommendDocDragList from './RecommendDocDragList';
 
 interface CardRobotWebComponentProps {
   kb: DomainKnowledgeBaseDetail;
@@ -48,25 +50,28 @@ const CardRobotWebComponent = ({ kb }: CardRobotWebComponentProps) => {
     defaultValues: {
       is_open: 0,
       theme_mode: 'light',
-      btn_style: 'hover_ball',
+      btn_style: 'side_sticky',
       btn_id: '',
       btn_position: 'bottom_right',
       disclaimer: '',
       btn_text: '',
       btn_logo: '',
       modal_position: 'follow',
+      copyright_hide_enabled: '0',
+      copyright_info: '',
       search_mode: 'all',
       placeholder: '',
       recommend_questions: [] as string[],
-      recommend_node_ids: [] as string[],
+      // recommend_node_ids: [] as string[],
     },
   });
 
   const [url, setUrl] = useState<string>('');
 
   const recommend_questions = watch('recommend_questions') || [];
-  const recommend_node_ids = watch('recommend_node_ids') || [];
-  const btn_style = watch('btn_style') || 'hover_ball';
+  // const recommend_node_ids = watch('recommend_node_ids') || [];
+  const btn_style = watch('btn_style') || 'side_sticky';
+  const copyright_hide_enabled = watch('copyright_hide_enabled') || '0';
   const isCustomButton = btn_style === 'btn_trigger';
 
   const recommendQuestionsField = useCommitPendingInput<string>({
@@ -98,24 +103,24 @@ const CardRobotWebComponent = ({ kb }: CardRobotWebComponentProps) => {
   const getDetail = () => {
     getApiV1AppDetail({ kb_id: kb.id!, type: '2' }).then(res => {
       setDetail(res);
+      const widget = res.settings?.widget_bot_settings;
       reset({
-        is_open: res.settings?.widget_bot_settings?.is_open ? 1 : 0,
-        theme_mode: res.settings?.widget_bot_settings?.theme_mode || 'light',
-        btn_style: res.settings?.widget_bot_settings?.btn_style || 'hover_ball',
-        btn_id: res.settings?.widget_bot_settings?.btn_id || '',
-        btn_position:
-          res.settings?.widget_bot_settings?.btn_position || 'bottom_right',
-        btn_text: res.settings?.widget_bot_settings?.btn_text || '在线客服',
-        btn_logo: res.settings?.widget_bot_settings?.btn_logo || '',
-        modal_position:
-          res.settings?.widget_bot_settings?.modal_position || 'follow',
-        search_mode: res.settings?.widget_bot_settings?.search_mode || 'all',
-        placeholder: res.settings?.widget_bot_settings?.placeholder || '',
-        disclaimer: res.settings?.widget_bot_settings?.disclaimer || '',
-        recommend_questions:
-          res.settings?.widget_bot_settings?.recommend_questions || [],
-        recommend_node_ids:
-          res.settings?.widget_bot_settings?.recommend_node_ids || [],
+        is_open: widget?.is_open ? 1 : 0,
+        theme_mode: widget?.theme_mode || 'light',
+        btn_style: widget?.btn_style || 'side_sticky',
+        btn_id: widget?.btn_id || '',
+        btn_position: widget?.btn_position || 'bottom_right',
+        btn_text: widget?.btn_text || '在线客服',
+        btn_logo: widget?.btn_logo || '',
+        modal_position: widget?.modal_position || 'follow',
+        search_mode: widget?.search_mode || 'all',
+        placeholder: widget?.placeholder || '',
+        disclaimer: widget?.disclaimer || '',
+        copyright_hide_enabled:
+          widget?.copyright_hide_enabled === true ? '1' : '0',
+        copyright_info: widget?.copyright_info || '',
+        recommend_questions: widget?.recommend_questions || [],
+        // recommend_node_ids:  widget?.recommend_node_ids || [],
       });
       setIsEnabled(res.settings?.widget_bot_settings?.is_open ? true : false);
     });
@@ -129,19 +134,10 @@ const CardRobotWebComponent = ({ kb }: CardRobotWebComponentProps) => {
         kb_id,
         settings: {
           widget_bot_settings: {
+            ...data,
             is_open: data.is_open === 1 ? true : false,
-            theme_mode: data.theme_mode as 'light' | 'dark',
-            btn_style: data.btn_style,
-            btn_id: data.btn_id,
-            btn_position: data.btn_position,
-            btn_text: data.btn_text,
-            btn_logo: data.btn_logo,
-            modal_position: data.modal_position,
-            search_mode: data.search_mode,
-            placeholder: data.placeholder,
-            disclaimer: data.disclaimer,
-            recommend_questions: data.recommend_questions || [],
-            recommend_node_ids: data.recommend_node_ids || [],
+            copyright_hide_enabled:
+              data.copyright_hide_enabled === '1' ? true : false,
           },
         },
       },
@@ -240,14 +236,45 @@ const CardRobotWebComponent = ({ kb }: CardRobotWebComponentProps) => {
                     bgcolor: 'warning.light',
                   }}
                 >
-                  <Icon type='icon-jinggao' />
-                  未配置域名，可在右侧
+                  <IconJinggao sx={{ fontSize: 16 }} />
+                  未配置域名，可在
                   <Box component={'span'} sx={{ fontWeight: 500 }}>
-                    服务监听方式
+                    门户网站 / 服务监听方式
                   </Box>{' '}
                   中配置
                 </Stack>
               )}
+            </FormItem>
+            <FormItem
+              label='配色方案'
+              sx={{ alignItems: 'flex-start' }}
+              labelSx={{ mt: 1 }}
+            >
+              <Controller
+                control={control}
+                name='theme_mode'
+                render={({ field }) => (
+                  <RadioGroup
+                    row
+                    {...field}
+                    onChange={e => {
+                      field.onChange(e.target.value);
+                      setIsEdit(true);
+                    }}
+                  >
+                    <FormControlLabel
+                      value='light'
+                      control={<Radio size='small' />}
+                      label={<Box sx={{ width: 100 }}>浅色模式</Box>}
+                    />
+                    <FormControlLabel
+                      value='dark'
+                      control={<Radio size='small' />}
+                      label={<Box sx={{ width: 100 }}>深色模式</Box>}
+                    />
+                  </RadioGroup>
+                )}
+              />
             </FormItem>
             <FormItem
               label='挂件配置'
@@ -450,43 +477,6 @@ const CardRobotWebComponent = ({ kb }: CardRobotWebComponentProps) => {
                 )}
                 <Collapse in={modalConfigOpen}>
                   <Stack spacing={2.5}>
-                    {/* <FormItem label='配色方案' sx={{ alignItems: 'flex-start' }} labelSx={{ mt: 1 }}>
-                      <Controller
-                        control={control}
-                        name='theme_mode'
-                        render={({ field }) => (
-                          <RadioGroup
-                            row
-                            {...field}
-                            onChange={e => {
-                              field.onChange(e.target.value);
-                              setIsEdit(true);
-                            }}
-                          >
-                            <FormControlLabel
-                              value='light'
-                              control={<Radio size='small' />}
-                              label={<Box sx={{ width: 100 }}>浅色模式</Box>}
-                            />
-                            <FormControlLabel
-                              value='dark'
-                              control={<Radio size='small' />}
-                              label={<Box sx={{ width: 100 }}>深色模式</Box>}
-                            />
-                            <FormControlLabel
-                              value='system'
-                              control={<Radio size='small' />}
-                              label={<Box sx={{ width: 100 }}>跟随系统</Box>}
-                            />
-                            <FormControlLabel
-                              value='wiki'
-                              control={<Radio size='small' />}
-                              label={<Box sx={{ width: 100 }}>跟随 WIKI 网站</Box>}
-                            />
-                          </RadioGroup>
-                        )}
-                      />
-                    </FormItem> */}
                     <FormItem
                       label='弹窗位置'
                       sx={{ alignItems: 'flex-start' }}
@@ -569,7 +559,7 @@ const CardRobotWebComponent = ({ kb }: CardRobotWebComponentProps) => {
                       />
                     </FormItem>
                     <FormItem
-                      label='搜索提示语'
+                      label='搜索提示'
                       sx={{ alignItems: 'flex-start' }}
                       labelSx={{ mt: 1 }}
                     >
@@ -580,7 +570,7 @@ const CardRobotWebComponent = ({ kb }: CardRobotWebComponentProps) => {
                           <TextField
                             fullWidth
                             {...field}
-                            placeholder='输入搜索提示语'
+                            placeholder='问问 AI 吧'
                             error={!!errors.placeholder}
                             helperText={errors.placeholder?.message}
                             onChange={event => {
@@ -601,7 +591,7 @@ const CardRobotWebComponent = ({ kb }: CardRobotWebComponentProps) => {
                         placeholder='回车确认，填写下一个推荐问题'
                       />
                     </FormItem>
-                    <FormItem
+                    {/* <FormItem
                       label='推荐文档'
                       sx={{ alignItems: 'flex-start' }}
                       labelSx={{ mt: 1 }}
@@ -613,30 +603,90 @@ const CardRobotWebComponent = ({ kb }: CardRobotWebComponentProps) => {
                           setValue('recommend_node_ids', value);
                         }}
                       />
-                    </FormItem>
-                    <FormItem
-                      label='免责声明'
-                      sx={{ alignItems: 'flex-start' }}
-                      labelSx={{ mt: 1 }}
-                    >
-                      <Controller
-                        control={control}
-                        name='disclaimer'
-                        render={({ field }) => (
-                          <TextField
-                            fullWidth
-                            {...field}
-                            placeholder='输入免责声明'
-                            error={!!errors.disclaimer}
-                            helperText={errors.disclaimer?.message}
-                            onChange={event => {
-                              setIsEdit(true);
-                              field.onChange(event);
-                            }}
+                    </FormItem> */}
+                    <VersionMask permission={PROFESSION_VERSION_PERMISSION}>
+                      <FormItem
+                        label='版权信息'
+                        sx={{ alignItems: 'flex-start' }}
+                        labelSx={{ mt: 1 }}
+                      >
+                        <Controller
+                          control={control}
+                          name='copyright_hide_enabled'
+                          render={({ field }) => {
+                            return (
+                              <RadioGroup
+                                row
+                                {...field}
+                                onChange={e => {
+                                  field.onChange(e.target.value);
+                                  setIsEdit(true);
+                                }}
+                              >
+                                <FormControlLabel
+                                  value='0'
+                                  control={<Radio size='small' />}
+                                  label={<Box sx={{ width: 100 }}>显示</Box>}
+                                />
+                                <FormControlLabel
+                                  value='1'
+                                  control={<Radio size='small' />}
+                                  label={<Box sx={{ width: 100 }}>隐藏</Box>}
+                                />
+                              </RadioGroup>
+                            );
+                          }}
+                        />
+                      </FormItem>
+                      {copyright_hide_enabled === '0' && (
+                        <FormItem
+                          label='版权文字'
+                          sx={{ alignItems: 'flex-start' }}
+                          labelSx={{ mt: 1 }}
+                        >
+                          <Controller
+                            control={control}
+                            name='copyright_info'
+                            render={({ field }) => (
+                              <TextField
+                                fullWidth
+                                {...field}
+                                placeholder='本网站由 PandaWiki 提供技术支持'
+                                error={!!errors.copyright_info}
+                                helperText={errors.copyright_info?.message}
+                                onChange={event => {
+                                  setIsEdit(true);
+                                  field.onChange(event);
+                                }}
+                              />
+                            )}
                           />
-                        )}
-                      />
-                    </FormItem>
+                        </FormItem>
+                      )}
+                      <FormItem
+                        label='免责声明'
+                        sx={{ alignItems: 'flex-start' }}
+                        labelSx={{ mt: 1 }}
+                      >
+                        <Controller
+                          control={control}
+                          name='disclaimer'
+                          render={({ field }) => (
+                            <TextField
+                              fullWidth
+                              {...field}
+                              placeholder='本回答由 PandaWiki AI 自动生成，仅供参考。'
+                              error={!!errors.disclaimer}
+                              helperText={errors.disclaimer?.message}
+                              onChange={event => {
+                                setIsEdit(true);
+                                field.onChange(event);
+                              }}
+                            />
+                          )}
+                        />
+                      </FormItem>
+                    </VersionMask>
                   </Stack>
                 </Collapse>
               </Box>

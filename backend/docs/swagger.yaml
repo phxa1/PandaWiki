@@ -181,42 +181,30 @@ definitions:
     - NodePermNameAnswerable
   consts.NodeRagInfoStatus:
     enum:
-    - BASIC_PENDING
-    - BASIC_RUNNING
-    - BASIC_FAILED
-    - BASIC_SUCCEEDED
-    - ENHANCE_PENDING
-    - ENHANCE_RUNNING
-    - ENHANCE_FAILED
-    - ENHANCE_SUCCEEDED
+    - PENDING
+    - RUNNING
+    - FAILED
+    - SUCCEEDED
+    - REINDEX
     type: string
     x-enum-comments:
-      NodeRagStatusBasicFailed: 基础处理失败
-      NodeRagStatusBasicPending: 等待基础处理
-      NodeRagStatusBasicRunning: 正在进行基础处理（文本分割、向量化等）
-      NodeRagStatusBasicSucceeded: 基础处理成功
-      NodeRagStatusEnhanceFailed: 增强处理失败
-      NodeRagStatusEnhancePending: 基础处理完成，等待增强处理
-      NodeRagStatusEnhanceRunning: 正在进行增强处理（关键词提取等）
-      NodeRagStatusEnhanceSucceeded: 增强处理成功
+      NodeRagStatusFailed: 处理失败
+      NodeRagStatusPending: 等待处理
+      NodeRagStatusReindexing: 重新索引中
+      NodeRagStatusRunning: 正在进行处理（文本分割、向量化等）
+      NodeRagStatusSucceeded: 处理成功
     x-enum-descriptions:
-    - 等待基础处理
-    - 正在进行基础处理（文本分割、向量化等）
-    - 基础处理失败
-    - 基础处理成功
-    - 基础处理完成，等待增强处理
-    - 正在进行增强处理（关键词提取等）
-    - 增强处理失败
-    - 增强处理成功
+    - 等待处理
+    - 正在进行处理（文本分割、向量化等）
+    - 处理失败
+    - 处理成功
+    - 重新索引中
     x-enum-varnames:
-    - NodeRagStatusBasicPending
-    - NodeRagStatusBasicRunning
-    - NodeRagStatusBasicFailed
-    - NodeRagStatusBasicSucceeded
-    - NodeRagStatusEnhancePending
-    - NodeRagStatusEnhanceRunning
-    - NodeRagStatusEnhanceFailed
-    - NodeRagStatusEnhanceSucceeded
+    - NodeRagStatusPending
+    - NodeRagStatusRunning
+    - NodeRagStatusFailed
+    - NodeRagStatusSucceeded
+    - NodeRagStatusReindexing
   consts.RedeemCaptchaReq:
     properties:
       solutions:
@@ -245,6 +233,7 @@ definitions:
     - discord_bot
     - wechat_official_account
     - openai_api
+    - mcp_server
     type: string
     x-enum-varnames:
     - SourceTypeDingTalk
@@ -264,6 +253,7 @@ definitions:
     - SourceTypeDiscordBot
     - SourceTypeWechatOfficialAccount
     - SourceTypeOpenAIAPI
+    - SourceTypeMcpServer
   consts.StatDay:
     enum:
     - 1
@@ -403,6 +393,8 @@ definitions:
     type: object
   domain.AppInfoResp:
     properties:
+      base_url:
+        type: string
       name:
         type: string
       recommend_nodes:
@@ -418,8 +410,6 @@ definitions:
         allOf:
         - $ref: '#/definitions/domain.AIFeedbackSettings'
         description: AI feedback
-      auto_sitemap:
-        type: boolean
       body_code:
         type: string
       btns:
@@ -431,6 +421,8 @@ definitions:
         description: catalog settings
       contribute_settings:
         $ref: '#/definitions/domain.ContributeSettings'
+      conversation_setting:
+        $ref: '#/definitions/domain.ConversationSetting'
       copy_setting:
         allOf:
         - $ref: '#/definitions/consts.CopySetting'
@@ -486,6 +478,10 @@ definitions:
         allOf:
         - $ref: '#/definitions/domain.LarkBotSettings'
         description: LarkBot
+      mcp_server_settings:
+        allOf:
+        - $ref: '#/definitions/domain.MCPServerSettings'
+        description: MCP Server Settings
       openai_api_bot_settings:
         allOf:
         - $ref: '#/definitions/domain.OpenAIAPIBotSettings'
@@ -500,6 +496,8 @@ definitions:
         type: array
       search_placeholder:
         type: string
+      stats_setting:
+        $ref: '#/definitions/domain.StatsSetting'
       theme_and_style:
         $ref: '#/definitions/domain.ThemeAndStyle'
       theme_mode:
@@ -532,6 +530,8 @@ definitions:
         type: array
       web_app_landing_theme:
         $ref: '#/definitions/domain.WebAppLandingTheme'
+      wechat_app_advanced_setting:
+        $ref: '#/definitions/domain.WeChatAppAdvancedSetting'
       wechat_app_agent_id:
         type: string
       wechat_app_corpid:
@@ -593,8 +593,6 @@ definitions:
         allOf:
         - $ref: '#/definitions/domain.AIFeedbackSettings'
         description: AI feedback
-      auto_sitemap:
-        type: boolean
       body_code:
         type: string
       btns:
@@ -606,6 +604,8 @@ definitions:
         description: catalog settings
       contribute_settings:
         $ref: '#/definitions/domain.ContributeSettings'
+      conversation_setting:
+        $ref: '#/definitions/domain.ConversationSetting'
       copy_setting:
         $ref: '#/definitions/consts.CopySetting'
       desc:
@@ -656,6 +656,10 @@ definitions:
         allOf:
         - $ref: '#/definitions/domain.LarkBotSettings'
         description: LarkBot
+      mcp_server_settings:
+        allOf:
+        - $ref: '#/definitions/domain.MCPServerSettings'
+        description: MCP Server Settings
       openai_api_bot_settings:
         allOf:
         - $ref: '#/definitions/domain.OpenAIAPIBotSettings'
@@ -670,6 +674,8 @@ definitions:
         type: array
       search_placeholder:
         type: string
+      stats_setting:
+        $ref: '#/definitions/domain.StatsSetting'
       theme_and_style:
         $ref: '#/definitions/domain.ThemeAndStyle'
       theme_mode:
@@ -697,6 +703,8 @@ definitions:
         type: array
       web_app_landing_theme:
         $ref: '#/definitions/domain.WebAppLandingTheme'
+      wechat_app_advanced_setting:
+        $ref: '#/definitions/domain.WeChatAppAdvancedSetting'
       wechat_app_agent_id:
         type: string
       wechat_app_corpid:
@@ -763,6 +771,7 @@ definitions:
     - 9
     - 10
     - 11
+    - 12
     format: int32
     type: integer
     x-enum-varnames:
@@ -777,6 +786,7 @@ definitions:
     - AppTypeOpenAIAPI
     - AppTypeWecomAIBot
     - AppTypeLarkBot
+    - AppTypeMcpServer
   domain.AuthUserInfo:
     properties:
       avatar_url:
@@ -941,13 +951,17 @@ definitions:
         type: string
       conversation_id:
         type: string
+      image_paths:
+        items:
+          type: string
+        maxItems: 3
+        type: array
       message:
         type: string
       nonce:
         type: string
     required:
     - app_type
-    - message
     type: object
   domain.ChatSearchReq:
     properties:
@@ -1099,15 +1113,6 @@ definitions:
       subject:
         type: string
     type: object
-  domain.ConversationDistribution:
-    properties:
-      app_id:
-        type: string
-      app_type:
-        $ref: '#/definitions/domain.AppType'
-      count:
-        type: integer
-    type: object
   domain.ConversationInfo:
     properties:
       user_info:
@@ -1152,6 +1157,10 @@ definitions:
         type: string
       id:
         type: string
+      image_paths:
+        items:
+          type: string
+        type: array
       info:
         allOf:
         - $ref: '#/definitions/domain.FeedBackInfo'
@@ -1216,6 +1225,13 @@ definitions:
       node_id:
         type: string
       url:
+        type: string
+    type: object
+  domain.ConversationSetting:
+    properties:
+      copyright_hide_enabled:
+        type: boolean
+      copyright_info:
         type: string
     type: object
   domain.CreateKBReleaseReq:
@@ -1614,6 +1630,22 @@ definitions:
       url:
         type: string
     type: object
+  domain.MCPServerSettings:
+    properties:
+      docs_tool_settings:
+        $ref: '#/definitions/domain.MCPToolSettings'
+      is_enabled:
+        type: boolean
+      sample_auth:
+        $ref: '#/definitions/domain.SimpleAuth'
+    type: object
+  domain.MCPToolSettings:
+    properties:
+      desc:
+        type: string
+      name:
+        type: string
+    type: object
   domain.MessageContent:
     type: object
   domain.MessageFrom:
@@ -1763,6 +1795,8 @@ definitions:
         $ref: '#/definitions/domain.NodePermissions'
       position:
         type: number
+      publisher_id:
+        type: string
       rag_info:
         $ref: '#/definitions/domain.RagInfo'
       status:
@@ -2156,15 +2190,25 @@ definitions:
         type: string
       created_at:
         type: string
+      image_paths:
+        items:
+          type: string
+        type: array
       role:
         $ref: '#/definitions/schema.RoleType'
     type: object
-  domain.ShareNodeListItemResp:
+  domain.ShareNodeDetailItem:
     properties:
+      children:
+        items:
+          $ref: '#/definitions/domain.ShareNodeDetailItem'
+        type: array
       emoji:
         type: string
       id:
         type: string
+      meta:
+        $ref: '#/definitions/domain.NodeMeta'
       name:
         type: string
       parent_id:
@@ -2234,6 +2278,11 @@ definitions:
     - StatPageSceneNodeDetail
     - StatPageSceneChat
     - StatPageSceneLogin
+  domain.StatsSetting:
+    properties:
+      pv_enable:
+        type: boolean
+    type: object
   domain.SwitchModeReq:
     properties:
       auto_mode_api_key:
@@ -2392,6 +2441,21 @@ definitions:
       user_id:
         type: string
     type: object
+  domain.WeChatAppAdvancedSetting:
+    properties:
+      disclaimer_content:
+        type: string
+      feedback_enable:
+        type: boolean
+      feedback_type:
+        items:
+          type: string
+        type: array
+      prompt:
+        type: string
+      text_response_enable:
+        type: boolean
+    type: object
   domain.WebAppCommentSettings:
     properties:
       is_enable:
@@ -2529,6 +2593,10 @@ definitions:
       btn_style:
         type: string
       btn_text:
+        type: string
+      copyright_hide_enabled:
+        type: boolean
+      copyright_info:
         type: string
       disclaimer:
         type: string
@@ -2920,11 +2988,6 @@ definitions:
       user_access_token:
         type: string
     type: object
-  v1.FileUploadResp:
-    properties:
-      key:
-        type: string
-    type: object
   v1.KBUserInviteReq:
     properties:
       kb_id:
@@ -3017,6 +3080,8 @@ definitions:
         type: string
       publisher_id:
         type: string
+      pv:
+        type: integer
       status:
         $ref: '#/definitions/domain.NodeStatus'
       type:
@@ -3103,6 +3168,15 @@ definitions:
     - id
     - new_password
     type: object
+  v1.ShareFileUploadReq:
+    properties:
+      captcha_token:
+        type: string
+      file:
+        type: string
+    required:
+    - captcha_token
+    type: object
   v1.ShareNodeDetailResp:
     properties:
       content:
@@ -3123,7 +3197,7 @@ definitions:
         type: string
       list:
         items:
-          $ref: '#/definitions/domain.ShareNodeListItemResp'
+          $ref: '#/definitions/domain.ShareNodeDetailItem'
         type: array
       meta:
         $ref: '#/definitions/domain.NodeMeta'
@@ -3137,12 +3211,21 @@ definitions:
         type: string
       publisher_id:
         type: string
+      pv:
+        type: integer
       status:
         $ref: '#/definitions/domain.NodeStatus'
       type:
         $ref: '#/definitions/domain.NodeType'
       updated_at:
         type: string
+    type: object
+  v1.StatConversationDistributionResp:
+    properties:
+      app_type:
+        $ref: '#/definitions/domain.AppType'
+      count:
+        type: integer
     type: object
   v1.StatCountResp:
     properties:
@@ -3189,6 +3272,19 @@ definitions:
         items:
           $ref: '#/definitions/v1.UserListItemResp'
         type: array
+    type: object
+  v1.WechatAppInfoResp:
+    properties:
+      disclaimer_content:
+        type: string
+      feedback_enable:
+        type: boolean
+      feedback_type:
+        items:
+          type: string
+        type: array
+      wechat_app_is_enabled:
+        type: boolean
     type: object
 info:
   contact: {}
@@ -3336,6 +3432,7 @@ paths:
         - discord_bot
         - wechat_official_account
         - openai_api
+        - mcp_server
         in: query
         name: source_type
         required: true
@@ -3358,6 +3455,7 @@ paths:
         - SourceTypeDiscordBot
         - SourceTypeWechatOfficialAccount
         - SourceTypeOpenAIAPI
+        - SourceTypeMcpServer
       produces:
       - application/json
       responses:
@@ -4660,7 +4758,7 @@ paths:
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/domain.ConversationDistribution'
+                    $ref: '#/definitions/v1.StatConversationDistributionResp'
                   type: array
               type: object
       security:
@@ -5035,6 +5133,32 @@ paths:
       summary: GetAppInfo
       tags:
       - share_app
+  /share/v1/app/wechat/info:
+    get:
+      consumes:
+      - application/json
+      description: WechatAppInfo
+      parameters:
+      - description: kb id
+        in: header
+        name: X-KB-ID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/domain.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/v1.WechatAppInfoResp'
+              type: object
+      summary: WechatAppInfo
+      tags:
+      - share_chat
   /share/v1/app/wechat/service/answer:
     get:
       consumes:
@@ -5459,7 +5583,7 @@ paths:
             - $ref: '#/definitions/domain.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/v1.FileUploadResp'
+                  $ref: '#/definitions/v1.ShareFileUploadReq'
               type: object
       summary: 文件上传
       tags:

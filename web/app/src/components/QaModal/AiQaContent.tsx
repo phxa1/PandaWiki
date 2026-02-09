@@ -3,24 +3,26 @@ import { useStore } from '@/provider';
 import SSEClient from '@/utils/fetch';
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { postShareV1CommonFileUpload } from '@/request/ShareFile';
 import dayjs from 'dayjs';
 import { ChunkResultItem } from '@/assets/type';
 import Logo from '@/assets/images/logo.png';
 import aiLoading from '@/assets/images/ai-loading.gif';
 import { getShareV1ConversationDetail } from '@/request/ShareConversation';
-import { message } from '@ctzhian/ui';
+import { message, Image as ImagePreview } from '@ctzhian/ui';
 import Feedback from '@/components/feedback';
 import { handleThinkingContent } from './utils';
 import { useSmartScroll } from '@/hooks';
 import { useTheme } from '@mui/material';
 import { v4 as uuidv4 } from 'uuid';
+import { useBasePath } from '@/hooks';
+import { IconCopy } from '@/components/icons';
 import {
-  IconCai,
-  IconCaied,
-  IconCopy,
-  IconZan,
-  IconZaned,
-} from '@/components/icons';
+  IconADiancaiWeixuanzhong2,
+  IconDiancaiWeixuanzhong,
+  IconDianzanXuanzhong1,
+  IconDianzanWeixuanzhong,
+} from '@panda-wiki/icons';
 import MarkDown2 from '@/components/markdown2';
 import { postShareV1ChatFeedback } from '@/request/ShareChat';
 import { copyText } from '@/utils';
@@ -74,7 +76,10 @@ import {
   StyledHotSearchColumnItem,
 } from './StyledComponents';
 
+import { getImagePath } from '@/utils/getImagePath';
+
 export interface ConversationItem {
+  image_paths: string[];
   q: string;
   a: string;
   score: number;
@@ -106,7 +111,13 @@ const LoadingContent = ({
   if (thinking === 4 || thinking === 2) return null;
   return (
     <Stack direction='row' alignItems='center' gap={1} sx={{ pb: 1 }}>
-      <Image src={aiLoading} alt='ai-loading' width={20} height={20} />
+      <Image
+        src={aiLoading}
+        alt='ai-loading'
+        unoptimized
+        width={20}
+        height={20}
+      />
       <Typography
         variant='body2'
         sx={theme => ({
@@ -132,6 +143,7 @@ const AiQaContent: React.FC<{
   }> | null>(null);
   const { palette } = useTheme();
   const messageIdRef = useRef('');
+  const lastResultExpendRef = useRef(false);
   const [fullAnswer, setFullAnswer] = useState<string>('');
   const [conversation, setConversation] = useState<ConversationItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -154,6 +166,7 @@ const AiQaContent: React.FC<{
   const [showFuzzySuggestions, setShowFuzzySuggestions] = useState(false);
 
   const searchParams = useSearchParams();
+  const basePath = useBasePath();
 
   // 使用智能滚动 hook（内置 ResizeObserver 自动监听内容高度变化，自动滚动）
   const { setShouldAutoScroll } = useSmartScroll({
@@ -182,16 +195,8 @@ const AiQaContent: React.FC<{
   };
 
   const handleSearch = (reset: boolean = false) => {
-    if (input.length > 0) {
+    if (input.length > 0 || uploadedImages.length > 0) {
       onSearch(input, reset);
-      setInput('');
-      // 清理图片URL
-      uploadedImages.forEach(img => {
-        if (img.url.startsWith('blob:')) {
-          URL.revokeObjectURL(img.url);
-        }
-      });
-      setUploadedImages([]);
     }
   };
 
@@ -204,7 +209,7 @@ const AiQaContent: React.FC<{
   const handleImageSelect = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
-    const maxImages = 9; // 最多9张图片
+    const maxImages = 3;
     const remainingSlots = maxImages - uploadedImages.length;
     if (remainingSlots <= 0) {
       message.warning(`最多只能上传 ${maxImages} 张图片`);
@@ -370,15 +375,55 @@ const AiQaContent: React.FC<{
     }
   };
 
+  // 上传所有图片到服务器
+  const uploadAllImages = async (): Promise<string[]> => {
+    if (uploadedImages.length === 0) return [];
+
+    const uploadedUrls: string[] = [];
+
+    try {
+      for (const image of uploadedImages) {
+        let token = '';
+        try {
+          const Cap = (await import(`@cap.js/widget`)).default;
+          const cap = new Cap({
+            apiEndpoint: `${basePath}/share/v1/captcha/`,
+          });
+          const solution = await cap.solve();
+          token = solution.token;
+        } catch (error) {
+          message.error('验证失败');
+          console.log(error, 'error---------');
+          return Promise.reject(error);
+        }
+        // 上传新图片
+        const result = await postShareV1CommonFileUpload({
+          file: image.file,
+          captcha_token: token,
+        });
+        const serverUrl = '/static-file/' + result.key;
+        uploadedUrls.push(serverUrl);
+      }
+
+      return uploadedUrls;
+    } catch (error: any) {
+      setLoading(false);
+      message.error(error.message || '图片上传失败');
+      throw error;
+    }
+  };
+
   const chatAnswer = async (q: string) => {
     setLoading(true);
     setThinking(1);
 
+    const imagePaths = await uploadAllImages();
+
     let token = '';
 
-    const Cap = (await import('@cap.js/widget')).default;
+    const Cap = (await import(`@cap.js/widget`)).default;
     const cap = new Cap({
-      apiEndpoint: '/share/v1/captcha/',
+      apiEndpoint: `${basePath}/share/v1/captcha/`,
     });
     try {
       const solution = await cap.solve();
@@ -393,6 +438,7 @@ const AiQaContent: React.FC<{
 
     const reqData = {
       message: q,
+      image_paths: imagePaths,
       nonce: '',
       conversation_id: '',
       app_type: 1,
@@ -469,7 +515,7 @@ const AiQaContent: React.FC<{
                 if (lastConversation) {
                   lastConversation.a = answerContent;
                   lastConversation.thinking_content = thinkingContent;
-                  lastConversation.result_expend = false;
+                  lastConversation.result_expend = lastResultExpendRef.current;
                   lastConversation.thinking_expend = false;
                 }
                 return newConversation;
@@ -499,18 +545,20 @@ const AiQaContent: React.FC<{
   useEffect(() => {
     // @ts-ignore
     window.CAP_CUSTOM_WASM_URL =
-      window.location.origin + '/cap@0.0.6/cap_wasm.min.js';
+      window.location.origin + `${basePath}/cap@0.0.6/cap_wasm.min.js`;
   }, []);
 
   const onSearch = (q: string, reset: boolean = false) => {
-    if (loading || !q.trim()) return;
+    if (loading || (!q.trim() && uploadedImages.length === 0)) return;
     setShouldAutoScroll(true); // 开始新搜索时，重置为自动滚动
     const newConversation = reset
       ? []
       : conversation.some(item => item.source === 'history')
         ? []
         : [...conversation];
+    lastResultExpendRef.current = false;
     newConversation.push({
+      image_paths: uploadedImages.map(img => img.url),
       q,
       a: '',
       score: 0,
@@ -526,7 +574,11 @@ const AiQaContent: React.FC<{
     messageIdRef.current = '';
     setConversation(newConversation);
     setFullAnswer('');
-    setTimeout(() => chatAnswer(q), 0);
+    setTimeout(() => {
+      chatAnswer(q);
+      setInput('');
+      setUploadedImages([]);
+    }, 0);
   };
 
   const handleSearchAbort = () => {
@@ -535,7 +587,7 @@ const AiQaContent: React.FC<{
     setThinking(4);
   };
 
-  const { mobile = false, kbDetail } = useStore();
+  const { mobile = false, kbDetail, qaModalOpen } = useStore();
 
   const isFeedbackEnabled =
     // @ts-ignore
@@ -565,7 +617,7 @@ const AiQaContent: React.FC<{
 
   useEffect(() => {
     sseClientRef.current = new SSEClient({
-      url: `/share/v1/chat/message`,
+      url: `${basePath}/share/v1/chat/message`,
       headers: {
         'Content-Type': 'application/json',
       },
@@ -629,30 +681,18 @@ const AiQaContent: React.FC<{
           };
           res.messages.forEach(message => {
             if (message.role === 'user') {
-              if (current.q) {
-                conversation.push({
-                  q: current.q,
-                  a: '',
-                  score: 0,
-                  update_time: '',
-                  message_id: '',
-                  source: 'history',
-                  chunk_result: [],
-                  thinking_content: '',
-                  result_expend: true,
-                  thinking_expend: true,
-                  id: uuidv4(),
-                });
-              }
               current = {
+                image_paths: message.image_paths || [],
                 q: message.content,
                 chunk_result: [],
               };
             } else if (message.role === 'assistant') {
-              if (current.q) {
+              if (
+                current.q ||
+                (current.image_paths && current.image_paths.length > 0)
+              ) {
                 const { thinkingContent, answerContent } =
                   handleThinkingContent(message.content || '');
-
                 current.a = answerContent;
                 current.update_time = message.created_at;
                 current.score = 0;
@@ -665,10 +705,13 @@ const AiQaContent: React.FC<{
               }
             }
           });
-
-          if (current.q) {
+          if (
+            current.q ||
+            (current.image_paths && current.image_paths.length > 0)
+          ) {
             conversation.push({
-              q: current.q,
+              image_paths: current.image_paths || [],
+              q: current.q || '',
               a: '',
               score: 0,
               update_time: '',
@@ -688,6 +731,18 @@ const AiQaContent: React.FC<{
     }
   }, []);
 
+  useEffect(() => {
+    if (!qaModalOpen) {
+      conversation.forEach(item => {
+        item.image_paths.forEach(image => {
+          if (image.startsWith('blob:')) {
+            URL.revokeObjectURL(image);
+          }
+        });
+      });
+    }
+  }, [qaModalOpen, conversation]);
+
   return (
     <StyledMainContainer className={palette.mode === 'dark' ? 'md-dark' : ''}>
       {/* 无对话时显示欢迎界面 */}
@@ -706,7 +761,7 @@ const AiQaContent: React.FC<{
           {/* Logo区域 */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, my: 8 }}>
             <Image
-              src={kbDetail?.settings?.icon || Logo.src}
+              src={getImagePath(kbDetail?.settings?.icon || Logo.src, basePath)}
               alt='logo'
               width={46}
               height={46}
@@ -796,9 +851,30 @@ const AiQaContent: React.FC<{
         <Stack gap={2}>
           {conversation.map((item, index) => (
             <StyledConversationItem key={item.id}>
-              {/* 用户问题气泡 - 右对齐 */}
-              <StyledUserBubble>{item.q}</StyledUserBubble>
+              {item.image_paths.length > 0 && (
+                <ImagePreview.PreviewGroup>
+                  <Stack direction='row' gap={1} sx={{ alignSelf: 'flex-end' }}>
+                    {item.image_paths.map((url: string) => (
+                      <ImagePreview
+                        alt={url}
+                        key={url}
+                        src={getImagePath(url, basePath)}
+                        width={100}
+                        height={100}
+                        style={{
+                          borderRadius: '10px',
+                          objectFit: 'cover',
+                          cursor: 'pointer',
+                        }}
+                        referrerPolicy='no-referrer'
+                      />
+                    ))}
+                  </Stack>
+                </ImagePreview.PreviewGroup>
+              )}
 
+              {/* 用户问题气泡 - 右对齐 */}
+              {item.q && <StyledUserBubble>{item.q}</StyledUserBubble>}
               {/* AI回答气泡 - 左对齐 */}
               <StyledAiBubble>
                 {/* 搜索结果 */}
@@ -808,6 +884,9 @@ const AiQaContent: React.FC<{
                     onChange={(event, expanded) => {
                       setConversation(prev => {
                         const newConversation = [...prev];
+                        if (index === conversation.length - 1) {
+                          lastResultExpendRef.current = expanded;
+                        }
                         newConversation[index].result_expend = expanded;
                         return newConversation;
                       });
@@ -828,7 +907,7 @@ const AiQaContent: React.FC<{
                     </StyledChunkAccordionSummary>
 
                     <StyledChunkAccordionDetails>
-                      <Stack gap={1}>
+                      <Stack gap={1} alignItems='flex-start'>
                         {item.chunk_result.map((chunk, chunkIndex) => (
                           <StyledChunkItem key={chunkIndex}>
                             <Typography
@@ -839,7 +918,10 @@ const AiQaContent: React.FC<{
                                 color: alpha(theme.palette.text.primary, 0.5),
                               })}
                               onClick={() => {
-                                window.open(`/node/${chunk.node_id}`, '_blank');
+                                window.open(
+                                  `${basePath}/node/${chunk.node_id}`,
+                                  '_blank',
+                                );
                               }}
                             >
                               {chunk.name}
@@ -931,10 +1013,10 @@ const AiQaContent: React.FC<{
                       {isFeedbackEnabled && item.source === 'chat' && (
                         <>
                           {item.score === 1 && (
-                            <IconZaned sx={{ cursor: 'pointer' }} />
+                            <IconDianzanXuanzhong1 sx={{ cursor: 'pointer' }} />
                           )}
                           {item.score !== 1 && (
-                            <IconZan
+                            <IconDianzanWeixuanzhong
                               sx={{ cursor: 'pointer' }}
                               onClick={() => {
                                 if (item.score === 0)
@@ -943,7 +1025,7 @@ const AiQaContent: React.FC<{
                             />
                           )}
                           {item.score !== -1 && (
-                            <IconCai
+                            <IconDiancaiWeixuanzhong
                               sx={{ cursor: 'pointer' }}
                               onClick={() => {
                                 if (item.score === 0) {
@@ -954,7 +1036,9 @@ const AiQaContent: React.FC<{
                             />
                           )}
                           {item.score === -1 && (
-                            <IconCaied sx={{ cursor: 'pointer' }} />
+                            <IconADiancaiWeixuanzhong2
+                              sx={{ cursor: 'pointer' }}
+                            />
                           )}
                         </>
                       )}
@@ -1043,7 +1127,7 @@ const AiQaContent: React.FC<{
               if (
                 e.key === 'Enter' &&
                 !e.shiftKey &&
-                input.length > 0 &&
+                (input.length > 0 || uploadedImages.length > 0) &&
                 !isComposing
               ) {
                 e.preventDefault();
@@ -1066,18 +1150,16 @@ const AiQaContent: React.FC<{
               style={{ display: 'none' }}
               onChange={handleImageUpload}
             />
-            <Tooltip title='敬请期待'>
-              <IconButton
-                size='small'
-                // onClick={() => fileInputRef.current?.click()}
-                disabled={loading}
-                sx={{
-                  flexShrink: 0,
-                }}
-              >
-                <IconTupian sx={{ fontSize: 20, color: 'text.secondary' }} />
-              </IconButton>
-            </Tooltip>
+            <IconButton
+              size='small'
+              onClick={() => fileInputRef.current?.click()}
+              disabled={loading}
+              sx={{
+                flexShrink: 0,
+              }}
+            >
+              <IconTupian sx={{ fontSize: 20, color: 'text.secondary' }} />
+            </IconButton>
 
             <Box
               sx={{
@@ -1097,8 +1179,9 @@ const AiQaContent: React.FC<{
               ) : (
                 <IconButton
                   size='small'
+                  disabled={input.length === 0 && uploadedImages.length === 0}
                   onClick={() => {
-                    if (input.length > 0) {
+                    if (input.length > 0 || uploadedImages.length > 0) {
                       handleSearchAbort();
                       setThinking(1);
                       handleSearch();
@@ -1109,7 +1192,9 @@ const AiQaContent: React.FC<{
                     sx={{
                       fontSize: 16,
                       color:
-                        input.length > 0 ? 'primary.main' : 'text.disabled',
+                        input.length > 0 || uploadedImages.length > 0
+                          ? 'primary.main'
+                          : 'text.disabled',
                     }}
                   />
                 </IconButton>

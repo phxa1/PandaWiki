@@ -54,6 +54,7 @@ interface HeaderProps {
   btns?: NavBtn[];
   children?: React.ReactNode;
   onQaClick?: () => void;
+  homePath?: string;
 }
 const Header = React.memo(
   ({
@@ -70,6 +71,7 @@ const Header = React.memo(
     btns,
     children,
     onQaClick,
+    homePath = '/',
   }: HeaderProps) => {
     const [ctrlKShortcut, setCtrlKShortcut] = useState('');
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -127,6 +129,7 @@ const Header = React.memo(
           left: 0,
           right: 0,
           height: 64,
+          flexShrink: 0,
           backgroundColor: isAtTop
             ? 'transparent'
             : theme.palette.background.default,
@@ -148,6 +151,7 @@ const Header = React.memo(
           sx={{
             position: 'relative',
             width: '100%',
+            minWidth: 0,
             // ...(isDocPage &&
             //   !mobile &&
             //   docWidth !== 'full' && {
@@ -155,7 +159,7 @@ const Header = React.memo(
             //   }),
           }}
         >
-          <Link href={'/'}>
+          <Link href={homePath} sx={{ flex: 1, minWidth: 0 }}>
             <Stack
               direction='row'
               alignItems='center'
@@ -166,8 +170,17 @@ const Header = React.memo(
                 '&:hover': { color: 'primary.main' },
               }}
             >
-              <img src={logo} alt='logo' height={36} />
-              <Box sx={{ fontSize: 20 }}>{title}</Box>
+              {logo && <img src={logo} alt='logo' height={36} />}
+              <Box
+                sx={{
+                  fontSize: 20,
+                  whiteSpace: 'nowrap',
+                  textOverflow: 'ellipsis',
+                  overflow: 'hidden',
+                }}
+              >
+                {title}
+              </Box>
             </Stack>
           </Link>
           {showSearch &&
@@ -177,7 +190,6 @@ const Header = React.memo(
                 direction='row'
                 alignItems='center'
                 justifyContent='flex-end'
-                sx={{ flex: 1 }}
               >
                 <IconButton
                   size='small'
@@ -195,11 +207,9 @@ const Header = React.memo(
                 focused={false}
                 onClick={() => onQaClick?.()}
                 sx={theme => ({
-                  position: 'absolute',
-                  left: '50%',
-                  top: '50%',
-                  transform: 'translate(-50%, -50%)',
+                  flex: 1,
                   maxWidth: '500px',
+                  minWidth: '220px',
                   borderRadius: '10px',
                   overflow: 'hidden',
                   cursor: 'pointer',
@@ -237,7 +247,7 @@ const Header = React.memo(
                         direction='row'
                         alignItems='center'
                         gap={1.5}
-                        sx={{ flexShrink: 0 }}
+                        sx={{ flexShrink: 0, ml: 1 }}
                       >
                         <Box
                           sx={{
@@ -258,13 +268,22 @@ const Header = React.memo(
             ))}
 
           {!mobile && btns && btns.length > 0 && (
-            <Stack direction='row' gap={2} alignItems='center'>
+            <Stack
+              direction='row'
+              gap={2}
+              alignItems='center'
+              justifyContent='flex-end'
+              sx={{
+                flex: 1,
+              }}
+            >
               {btns.slice(0, Math.min(2, btns.length)).map((item, index) => (
                 <Link key={index} href={item.url} target={item.target}>
                   <Button
                     variant={item.variant}
                     sx={theme => ({
                       px: 3.5,
+                      whiteSpace: 'nowrap',
                       textTransform: 'none',
                       boxSizing: 'border-box',
                       height: 40,
@@ -369,7 +388,14 @@ const Header = React.memo(
               )}
             </Stack>
           )}
-          {mobile && <NavBtns logo={logo} title={title} btns={btns} />}
+          {mobile && (
+            <NavBtns
+              logo={logo}
+              title={title}
+              btns={btns}
+              homePath={homePath}
+            />
+          )}
         </Stack>
         {children}
       </Stack>

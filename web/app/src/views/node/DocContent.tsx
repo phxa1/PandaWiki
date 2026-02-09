@@ -1,11 +1,11 @@
 'use client';
 
-import { NodeDetail } from '@/assets/type';
 import CommentInput, {
   CommentInputRef,
   ImageItem,
 } from '@/components/commentInput';
-import { IconFile, IconFolder } from '@/components/icons';
+import { IconWenjianjia, IconWenjian } from '@panda-wiki/icons';
+import FolderList from './folderList';
 import { DocWidth } from '@/constant';
 import { useStore } from '@/provider';
 import {
@@ -13,7 +13,7 @@ import {
   postShareV1Comment,
 } from '@/request/ShareComment';
 import { Editor, UseTiptapReturn } from '@ctzhian/tiptap';
-import { message } from '@ctzhian/ui';
+import { message, Image } from '@ctzhian/ui';
 import { Box, Button, Divider, Stack, TextField, alpha } from '@mui/material';
 import dayjs from 'dayjs';
 import 'dayjs/locale/zh-cn';
@@ -21,7 +21,10 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { useParams } from 'next/navigation';
 import React, { useEffect, useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
+import { V1ShareNodeDetailResp } from '@/request/types';
 import { PhotoProvider, PhotoView } from 'react-photo-view';
+import { getImagePath } from '@/utils/getImagePath';
+import { useBasePath } from '@/hooks';
 
 dayjs.extend(relativeTime);
 dayjs.locale('zh-cn');
@@ -34,13 +37,13 @@ const DocContent = ({
   characterCount,
 }: {
   docWidth?: string;
-  info?: NodeDetail;
+  info?: V1ShareNodeDetailResp;
   editorRef: UseTiptapReturn;
   commentList?: any[];
   characterCount?: number;
 }) => {
   const { mobile = false, authInfo, kbDetail, catalogWidth } = useStore();
-
+  const basePath = useBasePath();
   const params = useParams() || {};
   const [commentLoading, setCommentLoading] = useState(false);
   const docId = params.id as string;
@@ -85,7 +88,7 @@ const DocContent = ({
       try {
         const Cap = (await import('@cap.js/widget')).default;
         const cap = new Cap({
-          apiEndpoint: '/share/v1/captcha/',
+          apiEndpoint: `${basePath}/share/v1/captcha/`,
         });
         const solution = await cap.solve();
         token = solution.token;
@@ -130,7 +133,7 @@ const DocContent = ({
 
   useEffect(() => {
     window.CAP_CUSTOM_WASM_URL =
-      window.location.origin + '/cap@0.0.6/cap_wasm.min.js';
+      window.location.origin + `${basePath}/cap@0.0.6/cap_wasm.min.js`;
   }, []);
 
   if (!editorRef || !info) return null;
@@ -194,9 +197,9 @@ const DocContent = ({
         {info?.meta?.emoji ? (
           <Box sx={{ flexShrink: 0 }}>{info?.meta?.emoji}</Box>
         ) : info?.type === 1 ? (
-          <IconFolder sx={{ flexShrink: 0, mt: 0.5 }} />
+          <IconWenjianjia sx={{ flexShrink: 0, mt: 0.5 }} />
         ) : (
-          <IconFile sx={{ flexShrink: 0, mt: 0.5 }} />
+          <IconWenjian sx={{ flexShrink: 0, mt: 0.5 }} />
         )}
         {info?.name}
       </Stack>
@@ -233,6 +236,12 @@ const DocContent = ({
           <>
             <Box>·</Box>
             <Box>{characterCount} 字</Box>
+          </>
+        )}
+        {(info.pv ?? 0) > 0 && (
+          <>
+            <Box>·</Box>
+            <Box>浏览量 {info.pv}</Box>
           </>
         )}
       </Stack>
@@ -277,7 +286,10 @@ const DocContent = ({
           },
         }}
       >
-        {editorRef.editor && <Editor editor={editorRef.editor} />}
+        {info.type === 2 && editorRef.editor && (
+          <Editor editor={editorRef.editor} />
+        )}
+        {info.type === 1 && <FolderList list={info.list} />}
       </Box>
       {appDetail?.web_app_comment_settings?.is_enable && (
         <>
@@ -368,64 +380,23 @@ const DocContent = ({
                   </Box>
                   <Box sx={{ fontSize: 14 }}>{item.content}</Box>
                   <Stack direction='row' gap={1}>
-                    <PhotoProvider
-                      maskOpacity={0.3}
-                      toolbarRender={({ rotate, onRotate, onScale, scale }) => {
-                        return (
-                          <>
-                            <svg
-                              className='PhotoView-Slider__toolbarIcon'
-                              width='44'
-                              height='44'
-                              viewBox='0 0 768 768'
-                              fill='white'
-                              onClick={() => onScale(scale + 0.2)}
-                            >
-                              <path d='M384 640.5q105 0 180.75-75.75t75.75-180.75-75.75-180.75-180.75-75.75-180.75 75.75-75.75 180.75 75.75 180.75 180.75 75.75zM384 64.5q132 0 225.75 93.75t93.75 225.75-93.75 225.75-225.75 93.75-225.75-93.75-93.75-225.75 93.75-225.75 225.75-93.75zM415.5 223.5v129h129v63h-129v129h-63v-129h-129v-63h129v-129h63z' />
-                            </svg>
-                            <svg
-                              className='PhotoView-Slider__toolbarIcon'
-                              width='44'
-                              height='44'
-                              viewBox='0 0 768 768'
-                              fill='white'
-                              onClick={() => onScale(scale - 0.2)}
-                            >
-                              <path d='M384 640.5q105 0 180.75-75.75t75.75-180.75-75.75-180.75-180.75-75.75-180.75 75.75-75.75 180.75 75.75 180.75 180.75 75.75zM384 64.5q132 0 225.75 93.75t93.75 225.75-93.75 225.75-225.75 93.75-225.75-93.75-93.75-225.75 93.75-225.75 225.75-93.75zM223.5 352.5h321v63h-321v-63z' />
-                            </svg>
-                            <svg
-                              className='PhotoView-Slider__toolbarIcon'
-                              onClick={() => onRotate(rotate + 90)}
-                              width='44'
-                              height='44'
-                              fill='white'
-                              viewBox='0 0 768 768'
-                            >
-                              <path d='M565.5 202.5l75-75v225h-225l103.5-103.5c-34.5-34.5-82.5-57-135-57-106.5 0-192 85.5-192 192s85.5 192 192 192c84 0 156-52.5 181.5-127.5h66c-28.5 111-127.5 192-247.5 192-141 0-255-115.5-255-256.5s114-256.5 255-256.5c70.5 0 135 28.5 181.5 75z' />
-                            </svg>
-                          </>
-                        );
-                      }}
-                    >
+                    <Image.PreviewGroup>
                       {(item.pic_urls || []).map((url: string) => (
-                        <PhotoView key={url} src={url}>
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            alt={url}
-                            src={url}
-                            width={80}
-                            height={80}
-                            style={{
-                              borderRadius: '4px',
-                              objectFit: 'cover',
-                              boxShadow: '0px 0px 3px 1px rgba(0,0,5,0.15)',
-                              cursor: 'pointer',
-                            }}
-                            referrerPolicy='no-referrer'
-                          />
-                        </PhotoView>
+                        <Image
+                          alt={url}
+                          src={getImagePath(url, basePath)}
+                          width={80}
+                          height={80}
+                          style={{
+                            borderRadius: '4px',
+                            objectFit: 'cover',
+                            boxShadow: '0px 0px 3px 1px rgba(0,0,5,0.15)',
+                            cursor: 'pointer',
+                          }}
+                          referrerPolicy='no-referrer'
+                        />
                       ))}
-                    </PhotoProvider>
+                    </Image.PreviewGroup>
                   </Stack>
                   <Stack
                     direction='row'
