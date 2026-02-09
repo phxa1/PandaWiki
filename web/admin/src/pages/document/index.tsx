@@ -7,7 +7,7 @@ import {
   TreeMenuOptions,
 } from '@/components/Drag/DragTree/TreeMenu';
 import { useURLSearchParams } from '@/hooks';
-import { getApiV1NodeList } from '@/request/Node';
+import { getApiV1NodeList, postApiV1NodeRestudy } from '@/request/Node';
 import {
   ConstsCrawlerSource,
   ConstsNodeRagInfoStatus,
@@ -133,8 +133,26 @@ const Content = () => {
   };
 
   const handleRestudy = (item: ITreeItem) => {
-    setRagOpen(true);
-    setRagIds([item.id]);
+    const ragStatus = item.rag_status;
+    // 只有 Failed 或 Pending 状态才弹窗，其他状态直接调用接口
+    if (
+      ragStatus &&
+      [
+        ConstsNodeRagInfoStatus.NodeRagStatusFailed,
+        ConstsNodeRagInfoStatus.NodeRagStatusPending,
+      ].includes(ragStatus)
+    ) {
+      setRagOpen(true);
+      setRagIds([item.id]);
+    } else {
+      postApiV1NodeRestudy({
+        kb_id,
+        node_ids: [item.id],
+      }).then(() => {
+        message.success('正在学习');
+        getData();
+      });
+    }
   };
 
   const handleProperties = (item: ITreeItem) => {
@@ -249,6 +267,12 @@ const Content = () => {
                     handleUrl(item, ConstsCrawlerSource.CrawlerSourceFeishu),
                 },
                 {
+                  label: '通过钉钉文档导入',
+                  key: ConstsCrawlerSource.CrawlerSourceDingtalk,
+                  onClick: () =>
+                    handleUrl(item, ConstsCrawlerSource.CrawlerSourceDingtalk),
+                },
+                {
                   label: '通过 Confluence 导入',
                   key: ConstsCrawlerSource.CrawlerSourceConfluence,
                   onClick: () =>
@@ -263,15 +287,16 @@ const Content = () => {
         : []),
       ...(item.type === 2
         ? [
-            ...(item.status === 1
+            ...(item.status === 1 || item.status === 0
               ? [
                   {
-                    label: '更新发布',
+                    label: item.status === 1 ? '发布更新' : '发布文档',
                     key: 'update_publish',
                     onClick: () => handlePublish(item),
                   },
                 ]
               : []),
+
             // {
             //   label: item.summary ? '查看摘要' : '生成摘要',
             //   key: 'summary',
@@ -279,12 +304,7 @@ const Content = () => {
             // },
           ]
         : []),
-      ...(item.type === 2 &&
-      item.rag_status &&
-      [
-        ConstsNodeRagInfoStatus.NodeRagStatusFailed,
-        ConstsNodeRagInfoStatus.NodeRagStatusPending,
-      ].includes(item.rag_status)
+      ...(item.type === 2 && item.status !== 0
         ? [
             {
               label:
@@ -313,7 +333,12 @@ const Content = () => {
       ...(!isEditing
         ? [{ label: '重命名', key: 'rename', onClick: renameItem }]
         : []),
-      { label: '删除', key: 'delete', onClick: () => handleDelete(item) },
+      {
+        label: '删除',
+        color: 'error',
+        key: 'delete',
+        onClick: () => handleDelete(item),
+      },
     ];
   };
 
@@ -356,17 +381,20 @@ const Content = () => {
     getApiV1NodeList(params).then(res => {
       setList(res || []);
       setPublish({
-        unpublished: res.filter(it => it.status === 1).length,
+        unpublished: res.filter(it => it.status === 1 || it.status === 0)
+          .length,
       });
       setRagStartCount(
         res.filter(
           it =>
             it.type === 2 &&
             it.rag_info?.status &&
-            [
-              ConstsNodeRagInfoStatus.NodeRagStatusFailed,
-              ConstsNodeRagInfoStatus.NodeRagStatusPending,
-            ].includes(it.rag_info.status),
+            it.rag_info.status !==
+              ConstsNodeRagInfoStatus.NodeRagStatusSucceeded &&
+            it.rag_info.status !==
+              ConstsNodeRagInfoStatus.NodeRagStatusRunning &&
+            it.rag_info.status !==
+              ConstsNodeRagInfoStatus.NodeRagStatusReindexing,
         ).length,
       );
       const collapsedAll = collapseAllFolders(convertToTree(res || []), true);

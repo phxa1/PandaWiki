@@ -107,14 +107,15 @@ func (s *CTRAG) UpsertRecords(ctx context.Context, req *UpsertRecordsRequest) (s
 	data := &raglite.UploadDocumentRequest{
 		DatasetID:  req.DatasetID,
 		DocumentID: req.DocID,
+		Title:      req.Title,
 		File:       strings.NewReader(markdown),
 		Filename:   fmt.Sprintf("%s.md", req.ID),
 		Metadata:   make(map[string]interface{}),
 	}
-	if len(req.GroupIDs) > 0 {
+	if req.GroupIDs != nil {
 		data.Metadata["group_ids"] = req.GroupIDs
 	}
-	if len(req.Tags) > 0 {
+	if req.Tags != nil {
 		data.Tags = req.Tags
 	}
 	res, err := s.client.Documents.Upload(ctx, data)

@@ -4,27 +4,43 @@ import CommentInput, {
   CommentInputRef,
   ImageItem,
 } from '@/components/commentInput';
-import { IconWenjianjia, IconWenjian } from '@panda-wiki/icons';
-import FolderList from './folderList';
 import { DocWidth } from '@/constant';
+import { useBasePath } from '@/hooks';
 import { useStore } from '@/provider';
+import { copyText } from '@/utils';
 import {
   getShareV1CommentList,
   postShareV1Comment,
 } from '@/request/ShareComment';
+import { ConstsCopySetting, V1ShareNodeDetailResp } from '@/request/types';
+import { findAdjacentDocuments } from '@/utils';
+import { getImagePath } from '@/utils/getImagePath';
 import { Editor, UseTiptapReturn } from '@ctzhian/tiptap';
-import { message, Image } from '@ctzhian/ui';
-import { Box, Button, Divider, Stack, TextField, alpha } from '@mui/material';
+import { Image, message } from '@ctzhian/ui';
+import {
+  Box,
+  Button,
+  Divider,
+  IconButton,
+  Stack,
+  TextField,
+  Tooltip,
+  alpha,
+} from '@mui/material';
+import {
+  IconFuzhi,
+  IconMianbaoxie,
+  IconWenjian,
+  IconWenjianjia,
+} from '@panda-wiki/icons';
 import dayjs from 'dayjs';
 import 'dayjs/locale/zh-cn';
 import relativeTime from 'dayjs/plugin/relativeTime';
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { V1ShareNodeDetailResp } from '@/request/types';
-import { PhotoProvider, PhotoView } from 'react-photo-view';
-import { getImagePath } from '@/utils/getImagePath';
-import { useBasePath } from '@/hooks';
+import FolderList from './folderList';
 
 dayjs.extend(relativeTime);
 dayjs.locale('zh-cn');
@@ -42,7 +58,7 @@ const DocContent = ({
   commentList?: any[];
   characterCount?: number;
 }) => {
-  const { mobile = false, authInfo, kbDetail, catalogWidth } = useStore();
+  const { mobile = false, authInfo, kbDetail, catalogWidth, tree } = useStore();
   const basePath = useBasePath();
   const params = useParams() || {};
   const [commentLoading, setCommentLoading] = useState(false);
@@ -64,6 +80,14 @@ const DocContent = ({
   const commentInputRef = useRef<CommentInputRef>(null);
   const [contentFocused, setContentFocused] = useState(false);
   const [commentImages, setCommentImages] = useState<ImageItem[]>([]);
+
+  // 计算上一篇和下一篇文档
+  const adjacentDocs = useMemo(() => {
+    if (!tree || !docId || info?.type !== 2) {
+      return undefined;
+    }
+    return findAdjacentDocuments(tree, docId);
+  }, [tree, docId, info?.type]);
 
   const getComment = async () => {
     const res = await getShareV1CommentList({ id: docId });
@@ -150,6 +174,17 @@ const DocContent = ({
     );
   };
 
+  const onCopyDocMd = () => {
+    let context = editorRef.getMarkdown() || '';
+    // 如果设置了追加尾缀，则在复制内容后添加尾缀
+    if (
+      kbDetail?.settings?.copy_setting === ConstsCopySetting.CopySettingAppend
+    ) {
+      context += `\n\n-----------------------------------------\n内容来自 ${typeof window !== 'undefined' ? window.location.href : ''}`;
+    }
+    copyText(context);
+  };
+
   return (
     <Box
       id='doc-content'
@@ -205,46 +240,62 @@ const DocContent = ({
       </Stack>
       <Stack
         direction='row'
+        justifyContent='space-between'
         alignItems='center'
-        gap={1}
-        sx={{
-          fontSize: 14,
-          mb: 4,
-          color: 'text.tertiary',
-        }}
+        sx={{ mb: 4 }}
       >
-        {info?.created_at && (
-          <Box>
-            {info?.creator_account && info?.creator_account === 'admin'
-              ? '管理员'
-              : info?.creator_account}{' '}
-            {dayjs(info?.created_at).fromNow()}创建
-          </Box>
-        )}
-        {info?.updated_at && info.updated_at.slice(0, 1) !== '0' && (
-          <>
-            <Box>·</Box>
+        <Stack
+          direction='row'
+          alignItems='center'
+          gap={1}
+          sx={{
+            fontSize: 14,
+            color: 'text.tertiary',
+          }}
+        >
+          {info?.created_at && (
             <Box>
-              {info?.editor_account && info?.editor_account === 'admin'
+              {info?.creator_account && info?.creator_account === 'admin'
                 ? '管理员'
-                : info?.editor_account}{' '}
-              {dayjs(info.updated_at).fromNow()}更新
+                : info?.creator_account}{' '}
+              {dayjs(info?.created_at).fromNow()}创建
             </Box>
-          </>
-        )}
-        {!!characterCount && characterCount > 0 && (
-          <>
-            <Box>·</Box>
-            <Box>{characterCount} 字</Box>
-          </>
-        )}
-        {(info.pv ?? 0) > 0 && (
-          <>
-            <Box>·</Box>
-            <Box>浏览量 {info.pv}</Box>
-          </>
-        )}
+          )}
+          {info?.updated_at && info.updated_at.slice(0, 1) !== '0' && (
+            <>
+              <Box>·</Box>
+              <Box>
+                {info?.editor_account && info?.editor_account === 'admin'
+                  ? '管理员'
+                  : info?.editor_account}{' '}
+                {dayjs(info.updated_at).fromNow()}更新
+              </Box>
+            </>
+          )}
+          {!!characterCount && characterCount > 0 && (
+            <>
+              <Box>·</Box>
+              <Box>{characterCount} 字</Box>
+            </>
+          )}
+          {(info.pv ?? 0) > 0 && (
+            <>
+              <Box>·</Box>
+              <Box>浏览量 {info.pv}</Box>
+            </>
+          )}
+        </Stack>
+        {info?.type === 2 &&
+          kbDetail?.settings?.copy_setting !==
+            ConstsCopySetting.CopySettingDisabled && (
+            <Tooltip title='复制 MarkDown 格式' arrow placement='top'>
+              <IconButton size='small' onClick={onCopyDocMd}>
+                <IconFuzhi sx={{ fontSize: 16 }} />
+              </IconButton>
+            </Tooltip>
+          )}
       </Stack>
+
       {info?.meta?.summary && (
         <Box
           sx={{
@@ -291,6 +342,92 @@ const DocContent = ({
         )}
         {info.type === 1 && <FolderList list={info.list} />}
       </Box>
+      {adjacentDocs && (adjacentDocs.prev || adjacentDocs.next) && (
+        <Stack
+          direction='row'
+          justifyContent='space-between'
+          alignItems='center'
+          sx={{
+            mt: 4,
+            mb: appDetail?.web_app_comment_settings?.is_enable ? 0 : 2,
+            gap: 2,
+          }}
+        >
+          {adjacentDocs.prev ? (
+            <Box
+              component={Link}
+              href={`${basePath}/node/${adjacentDocs.prev.id}`}
+              sx={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                color: 'text.tertiary',
+                textDecoration: 'none',
+                maxWidth: '48%',
+                '&:hover': {
+                  color: 'text.primary',
+                },
+                transition: 'color 0.2s ease-in-out',
+              }}
+            >
+              <IconMianbaoxie
+                sx={{
+                  flexShrink: 0,
+                  fontSize: 14,
+                  transform: 'rotate(180deg)',
+                }}
+              />
+              <Box
+                sx={{
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  textAlign: 'left',
+                }}
+              >
+                上一篇：{adjacentDocs.prev.name}
+              </Box>
+            </Box>
+          ) : (
+            <Box sx={{ flex: 1 }} />
+          )}
+          {adjacentDocs.next ? (
+            <Box
+              component={Link}
+              href={`${basePath}/node/${adjacentDocs.next.id}`}
+              sx={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                gap: 1,
+                color: 'text.tertiary',
+                textDecoration: 'none',
+                maxWidth: '48%',
+                '&:hover': {
+                  color: 'text.primary',
+                },
+                transition: 'color 0.2s ease-in-out',
+              }}
+            >
+              <Box
+                sx={{
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  textAlign: 'right',
+                }}
+              >
+                下一篇：{adjacentDocs.next.name}
+              </Box>
+              <IconMianbaoxie sx={{ flexShrink: 0, fontSize: 14 }} />
+            </Box>
+          ) : (
+            <Box sx={{ flex: 1 }} />
+          )}
+        </Stack>
+      )}
       {appDetail?.web_app_comment_settings?.is_enable && (
         <>
           {' '}

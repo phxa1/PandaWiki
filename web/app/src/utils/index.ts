@@ -1,6 +1,6 @@
+import { ITreeItem } from '@/assets/type';
 import { message } from '@ctzhian/ui';
 import { ResolvingMetadata } from 'next';
-import { ITreeItem } from '@/assets/type';
 export { getBasePath } from './getBasePath';
 export { getImagePath } from './getImagePath';
 
@@ -27,46 +27,56 @@ export function addOpacityToColor(color: string, opacity: number) {
   return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
 }
 
+/**
+ * 复制文本到剪贴板
+ * 优先使用现代 Clipboard API（需要安全上下文：HTTPS 或 localhost）
+ * 降级使用 document.execCommand（兼容非 HTTPS 环境）
+ */
 export const copyText = (text: string, callback?: () => void) => {
-  const isNotHttps = !/^https:\/\//.test(window.location.origin);
+  // 使用降级方案的辅助函数
+  const fallbackCopy = () => {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.opacity = '0';
+    textArea.style.left = '-9999px';
+    textArea.style.top = '-9999px';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
 
-  if (isNotHttps) {
-    message.error('非 https 协议下不支持复制，请使用 https 协议');
-    return;
-  }
+    try {
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textArea);
 
-  try {
-    if (navigator.clipboard && window.isSecureContext) {
-      navigator.clipboard.writeText(text);
-      message.success('复制成功');
-      callback?.();
-    } else {
-      const textArea = document.createElement('textarea');
-      textArea.style.position = 'fixed';
-      textArea.style.opacity = '0';
-      textArea.style.left = '-9999px';
-      textArea.style.top = '-9999px';
-      textArea.value = text;
-      document.body.appendChild(textArea);
-      textArea.focus();
-      textArea.select();
-      try {
-        const successful = document.execCommand('copy');
-        if (successful) {
-          message.success('复制成功');
-          callback?.();
-        } else {
-          message.error('复制失败，请手动复制');
-        }
-      } catch (err) {
-        console.error(err);
+      if (successful) {
+        message.success('复制成功');
+        callback?.();
+      } else {
         message.error('复制失败，请手动复制');
       }
+    } catch (err) {
       document.body.removeChild(textArea);
+      console.error('复制失败:', err);
+      message.error('复制失败，请手动复制');
     }
-  } catch (err) {
-    console.error(err);
-    message.error('复制失败，请手动复制');
+  };
+
+  // 优先使用现代 Clipboard API
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        message.success('复制成功');
+        callback?.();
+      })
+      .catch(err => {
+        console.error('Clipboard API 失败，尝试降级方案:', err);
+        fallbackCopy();
+      });
+  } else {
+    // 非安全上下文（如 HTTP）使用降级方案
+    fallbackCopy();
   }
 };
 
@@ -174,4 +184,63 @@ export const deepSearchFirstNode = (
       }
     }
   }
+};
+
+/**
+ * 将树形结构扁平化为文档列表（只包含 type === 2 的文档节点）
+ * 按照树的前序遍历顺序排列
+ */
+const flattenDocuments = (tree: ITreeItem[]): ITreeItem[] => {
+  const documents: ITreeItem[] = [];
+
+  const traverse = (nodes: ITreeItem[]) => {
+    for (const node of nodes) {
+      // 只添加文档节点（type === 2），不添加文件夹（type === 1）
+      if (node.type === 2) {
+        documents.push(node);
+      }
+      // 递归遍历子节点
+      if (node.children && node.children.length > 0) {
+        traverse(node.children);
+      }
+    }
+  };
+
+  traverse(tree);
+  return documents;
+};
+
+/**
+ * 根据当前文档 ID 查找上一篇和下一篇文档
+ * @param tree 目录树结构
+ * @param currentId 当前文档 ID
+ * @returns 返回 { prev: 上一篇文档, next: 下一篇文档 }，如果不存在则返回 undefined
+ */
+export const findAdjacentDocuments = (
+  tree: ITreeItem[],
+  currentId: string,
+): { prev?: ITreeItem; next?: ITreeItem } | undefined => {
+  if (!tree || tree.length === 0 || !currentId) {
+    return undefined;
+  }
+
+  // 扁平化树结构，只保留文档节点
+  const documents = flattenDocuments(tree);
+
+  // 找到当前文档的索引
+  const currentIndex = documents.findIndex(doc => doc.id === currentId);
+
+  // 如果找不到当前文档，返回 undefined
+  if (currentIndex === -1) {
+    return undefined;
+  }
+
+  // 获取上一篇和下一篇
+  const prev = currentIndex > 0 ? documents[currentIndex - 1] : undefined;
+  const next =
+    currentIndex < documents.length - 1
+      ? documents[currentIndex + 1]
+      : undefined;
+
+  return { prev, next };
 };

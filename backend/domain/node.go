@@ -27,8 +27,9 @@ const (
 type NodeStatus uint16
 
 const (
-	NodeStatusDraft    NodeStatus = 1
-	NodeStatusReleased NodeStatus = 2
+	NodeStatusUnreleased NodeStatus = 0 // 未发布
+	NodeStatusDraft      NodeStatus = 1 // 更新未发布
+	NodeStatusReleased   NodeStatus = 2 // 已发布
 )
 
 const (
@@ -62,8 +63,9 @@ func (Node) TableName() string {
 }
 
 type RagInfo struct {
-	Status  consts.NodeRagInfoStatus `json:"status"`
-	Message string                   `json:"message"`
+	Status   consts.NodeRagInfoStatus `json:"status"`
+	Message  string                   `json:"message"`
+	SyncedAt time.Time                `json:"synced_at"`
 }
 
 func (d *RagInfo) Value() (driver.Value, error) {

@@ -645,6 +645,7 @@ const AiQaContent: React.FC<{
       sessionStorage.removeItem('chat_search_query');
       const newSearchParams = new URLSearchParams(searchParams.toString());
       newSearchParams.delete('cid');
+      newSearchParams.delete('ask');
       window.history.replaceState(null, '', newSearchParams.toString());
       onSearch(searchQuery, true);
     }
@@ -652,6 +653,7 @@ const AiQaContent: React.FC<{
       handleSearchAbort();
       const currentUrl = new URL(window.location.href);
       currentUrl.searchParams.delete('cid');
+      currentUrl.searchParams.delete('ask');
       window.history.replaceState(null, '', currentUrl.toString());
       setTimeout(() => {
         onReset();
@@ -662,8 +664,8 @@ const AiQaContent: React.FC<{
   useEffect(() => {
     if (conversationId) {
       const currentUrl = new URL(window.location.href);
-      currentUrl.searchParams.delete('sid');
       currentUrl.searchParams.set('cid', conversationId);
+      currentUrl.searchParams.delete('ask');
       window.history.replaceState(null, '', currentUrl.toString());
     }
   }, [conversationId]);
@@ -1145,7 +1147,7 @@ const AiQaContent: React.FC<{
             <input
               ref={fileInputRef}
               type='file'
-              accept='image/*'
+              accept='.jpg,.jpeg,.png,.webp'
               multiple
               style={{ display: 'none' }}
               onChange={handleImageUpload}

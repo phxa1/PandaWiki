@@ -128,6 +128,22 @@ func (r *KnowledgeBaseRepository) SyncKBAccessSettingsToCaddy(ctx context.Contex
 				"disable_certificates": true,
 				"disable_redirects":    true,
 			}
+			// SSL port: collect certificate tags for tls_connection_policies
+			certTags := make([]string, 0)
+			for _, kb := range hostKBMap {
+				if len(kb.AccessSettings.PublicKey) > 0 && len(kb.AccessSettings.PrivateKey) > 0 {
+					certTags = append(certTags, kb.ID)
+				}
+			}
+			if len(certTags) > 0 {
+				server["tls_connection_policies"] = []map[string]any{
+					{
+						"certificate_selection": map[string]any{
+							"any_tag": certTags,
+						},
+					},
+				}
+			}
 		}
 		routes := make([]map[string]any, 0)
 		var defaultRoute map[string]any
@@ -197,15 +213,43 @@ func (r *KnowledgeBaseRepository) SyncKBAccessSettingsToCaddy(ctx context.Contex
 								},
 								"handle": []map[string]any{
 									{
-										"handler": "reverse_proxy",
-										"upstreams": []map[string]any{
-											{"dial": staticFile},
-										},
-										"flush_interval": -1,
-										"transport": map[string]any{
-											"protocol":      "http",
-											"read_timeout":  "10m",
-											"write_timeout": "10m",
+										"handler": "subroute",
+										"routes": []map[string]any{
+											{
+												"match": []map[string]any{
+													{
+														"not": []map[string]any{
+															{"path_regexp": map[string]string{"pattern": `(?i)\.pdf($|\?)`}},
+														},
+													},
+												},
+												"handle": []map[string]any{
+													{
+														"handler": "headers",
+														"response": map[string]any{
+															"set": map[string][]string{
+																"Content-Disposition": {"attachment"},
+															},
+														},
+													},
+												},
+											},
+											{
+												"handle": []map[string]any{
+													{
+														"handler": "reverse_proxy",
+														"upstreams": []map[string]any{
+															{"dial": staticFile},
+														},
+														"flush_interval": -1,
+														"transport": map[string]any{
+															"protocol":      "http",
+															"read_timeout":  "10m",
+															"write_timeout": "10m",
+														},
+													},
+												},
+											},
 										},
 									},
 								},
@@ -632,6 +676,8 @@ func (r *KnowledgeBaseRepository) GetKBReleaseList(ctx context.Context, kbID str
 
 	var releases []domain.KBReleaseListItemResp
 	if err := r.db.WithContext(ctx).Model(&domain.KBRelease{}).
+		Select("publish.account as publisher_account, kb_releases.*").
+		Joins("left join users publish on kb_releases.publisher_id = publish.id").
 		Where("kb_id = ?", kbID).
 		Order("created_at DESC").
 		Offset(offset).

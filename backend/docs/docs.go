@@ -3740,7 +3740,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/v1.ShareFileUploadReq"
+                                            "$ref": "#/definitions/v1.FileUploadResp"
                                         }
                                     }
                                 }
@@ -4022,6 +4022,43 @@ const docTemplate = `{
                 }
             }
         },
+        "anydoc.DingtalkSetting": {
+            "type": "object",
+            "properties": {
+                "app_id": {
+                    "type": "string"
+                },
+                "app_secret": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "space_id": {
+                    "type": "string"
+                },
+                "unionid": {
+                    "type": "string"
+                }
+            }
+        },
+        "anydoc.FeishuSetting": {
+            "type": "object",
+            "properties": {
+                "app_id": {
+                    "type": "string"
+                },
+                "app_secret": {
+                    "type": "string"
+                },
+                "space_id": {
+                    "type": "string"
+                },
+                "user_access_token": {
+                    "type": "string"
+                }
+            }
+        },
         "anydoc.Value": {
             "type": "object",
             "properties": {
@@ -4096,6 +4133,7 @@ const docTemplate = `{
                 "sitemap",
                 "notion",
                 "feishu",
+                "dingtalk",
                 "file",
                 "epub",
                 "yuque",
@@ -4110,6 +4148,7 @@ const docTemplate = `{
                 "CrawlerSourceSitemap",
                 "CrawlerSourceNotion",
                 "CrawlerSourceFeishu",
+                "CrawlerSourceDingtalk",
                 "CrawlerSourceFile",
                 "CrawlerSourceEpub",
                 "CrawlerSourceYuque",
@@ -4345,6 +4384,7 @@ const docTemplate = `{
             "type": "string",
             "enum": [
                 "",
+                "not null",
                 "full_control",
                 "doc_manage",
                 "data_operate"
@@ -4353,16 +4393,19 @@ const docTemplate = `{
                 "UserKBPermissionDataOperate": "数据运营",
                 "UserKBPermissionDocManage": "文档管理",
                 "UserKBPermissionFullControl": "完全控制",
+                "UserKBPermissionNotNull": "有权限",
                 "UserKBPermissionNull": "无权限"
             },
             "x-enum-descriptions": [
                 "无权限",
+                "有权限",
                 "完全控制",
                 "文档管理",
                 "数据运营"
             ],
             "x-enum-varnames": [
                 "UserKBPermissionNull",
+                "UserKBPermissionNotNull",
                 "UserKBPermissionFullControl",
                 "UserKBPermissionDocManage",
                 "UserKBPermissionDataOperate"
@@ -6349,6 +6392,9 @@ const docTemplate = `{
                 "message": {
                     "type": "string"
                 },
+                "publisher_account": {
+                    "type": "string"
+                },
                 "tag": {
                     "type": "string"
                 }
@@ -6752,10 +6798,22 @@ const docTemplate = `{
             "type": "integer",
             "format": "int32",
             "enum": [
+                0,
                 1,
                 2
             ],
+            "x-enum-comments": {
+                "NodeStatusDraft": "更新未发布",
+                "NodeStatusReleased": "已发布",
+                "NodeStatusUnreleased": "未发布"
+            },
+            "x-enum-descriptions": [
+                "未发布",
+                "更新未发布",
+                "已发布"
+            ],
             "x-enum-varnames": [
+                "NodeStatusUnreleased",
                 "NodeStatusDraft",
                 "NodeStatusReleased"
             ]
@@ -7162,6 +7220,9 @@ const docTemplate = `{
                 },
                 "status": {
                     "$ref": "#/definitions/consts.NodeRagInfoStatus"
+                },
+                "synced_at": {
+                    "type": "string"
                 }
             }
         },
@@ -8361,8 +8422,11 @@ const docTemplate = `{
                 "crawler_source": {
                     "$ref": "#/definitions/consts.CrawlerSource"
                 },
+                "dingtalk_setting": {
+                    "$ref": "#/definitions/anydoc.DingtalkSetting"
+                },
                 "feishu_setting": {
-                    "$ref": "#/definitions/v1.FeishuSetting"
+                    "$ref": "#/definitions/anydoc.FeishuSetting"
                 },
                 "filename": {
                     "type": "string"
@@ -8489,19 +8553,10 @@ const docTemplate = `{
                 }
             }
         },
-        "v1.FeishuSetting": {
+        "v1.FileUploadResp": {
             "type": "object",
             "properties": {
-                "app_id": {
-                    "type": "string"
-                },
-                "app_secret": {
-                    "type": "string"
-                },
-                "space_id": {
-                    "type": "string"
-                },
-                "user_access_token": {
+                "key": {
                     "type": "string"
                 }
             }
@@ -8773,20 +8828,6 @@ const docTemplate = `{
                 "new_password": {
                     "type": "string",
                     "minLength": 8
-                }
-            }
-        },
-        "v1.ShareFileUploadReq": {
-            "type": "object",
-            "required": [
-                "captcha_token"
-            ],
-            "properties": {
-                "captcha_token": {
-                    "type": "string"
-                },
-                "file": {
-                    "type": "string"
                 }
             }
         },

@@ -87,6 +87,7 @@ func (h *RAGMQHandler) HandleNodeContentVectorRequest(ctx context.Context, msg t
 		// upsert node content chunks
 		docID, err := h.rag.UpsertRecords(ctx, &rag.UpsertRecordsRequest{
 			ID:        nodeRelease.ID,
+			Title:     nodeRelease.Name,
 			DatasetID: kb.DatasetID,
 			DocID:     nodeRelease.DocID,
 			Content:   nodeRelease.Content,
@@ -147,7 +148,7 @@ func (h *RAGMQHandler) HandleNodeContentVectorRequest(ctx context.Context, msg t
 			return nil
 		}
 
-		summary, err := h.llmUsecase.SummaryNode(ctx, model, node.Name, node.Content)
+		summary, err := h.llmUsecase.SummaryNode(ctx, request.KBID, model, node.Name, node.Content)
 		if err != nil {
 			h.logger.Error("summary node content failed", log.Error(err))
 			return nil
@@ -156,6 +157,13 @@ func (h *RAGMQHandler) HandleNodeContentVectorRequest(ctx context.Context, msg t
 			h.logger.Error("update node summary failed", log.Error(err))
 			return nil
 		}
+		if node.Status == domain.NodeStatusReleased {
+			if err := h.nodeRepo.UpdateNodeStatus(ctx, request.KBID, request.NodeID, domain.NodeStatusDraft); err != nil {
+				h.logger.Error("update node status failed", log.Error(err))
+				return nil
+			}
+		}
+
 		h.logger.Info("summary node content vector success", log.Any("summary_id", request.NodeReleaseID), log.Any("summary", summary))
 	}
 

@@ -41,7 +41,11 @@ export enum DomainNodeType {
 
 /** @format int32 */
 export enum DomainNodeStatus {
+  /** 未发布 */
+  NodeStatusUnreleased = 0,
+  /** 更新未发布 */
   NodeStatusDraft = 1,
+  /** 已发布 */
   NodeStatusReleased = 2,
 }
 
@@ -100,6 +104,8 @@ export enum ConstsUserRole {
 export enum ConstsUserKBPermission {
   /** 无权限 */
   UserKBPermissionNull = "",
+  /** 有权限 */
+  UserKBPermissionNotNull = "not null",
   /** 完全控制 */
   UserKBPermissionFullControl = "full_control",
   /** 文档管理 */
@@ -204,6 +210,7 @@ export enum ConstsCrawlerSource {
   CrawlerSourceSitemap = "sitemap",
   CrawlerSourceNotion = "notion",
   CrawlerSourceFeishu = "feishu",
+  CrawlerSourceDingtalk = "dingtalk",
   CrawlerSourceFile = "file",
   CrawlerSourceEpub = "epub",
   CrawlerSourceYuque = "yuque",
@@ -234,6 +241,21 @@ export enum ConstsAuthType {
 export interface AnydocChild {
   children?: AnydocChild[];
   value?: AnydocValue;
+}
+
+export interface AnydocDingtalkSetting {
+  app_id?: string;
+  app_secret?: string;
+  phone?: string;
+  space_id?: string;
+  unionid?: string;
+}
+
+export interface AnydocFeishuSetting {
+  app_id?: string;
+  app_secret?: string;
+  space_id?: string;
+  user_access_token?: string;
 }
 
 export interface AnydocValue {
@@ -890,6 +912,7 @@ export interface DomainKBReleaseListItemResp {
   id?: string;
   kb_id?: string;
   message?: string;
+  publisher_account?: string;
   tag?: string;
 }
 
@@ -1168,6 +1191,7 @@ export interface DomainQuestionConfig {
 export interface DomainRagInfo {
   message?: string;
   status?: ConstsNodeRagInfoStatus;
+  synced_at?: string;
 }
 
 export interface DomainRecommendNodeListResp {
@@ -1584,7 +1608,8 @@ export interface V1CrawlerExportResp {
 
 export interface V1CrawlerParseReq {
   crawler_source: ConstsCrawlerSource;
-  feishu_setting?: V1FeishuSetting;
+  dingtalk_setting?: AnydocDingtalkSetting;
+  feishu_setting?: AnydocFeishuSetting;
   filename?: string;
   kb_id: string;
   key?: string;
@@ -1628,13 +1653,6 @@ export interface V1CreateUserReq {
 
 export interface V1CreateUserResp {
   id?: string;
-}
-
-export interface V1FeishuSetting {
-  app_id?: string;
-  app_secret?: string;
-  space_id?: string;
-  user_access_token?: string;
 }
 
 export interface V1FileUploadResp {
