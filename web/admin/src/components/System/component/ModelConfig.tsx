@@ -247,6 +247,7 @@ const ModelConfig = forwardRef<ModelConfigRef, ModelConfigProps>(
             support_images: value.support_image,
             support_computer_use: value.support_compute,
             support_prompt_cache: value.support_prompt_caching,
+            temperature: value.temperature,
           },
         })
         .then(res => {
@@ -284,6 +285,7 @@ const ModelConfig = forwardRef<ModelConfigRef, ModelConfigProps>(
               support_images: value.support_image,
               support_computer_use: value.support_compute,
               support_prompt_cache: value.support_prompt_caching,
+              temperature: value.temperature,
             },
           })
           .then(res => {
@@ -315,6 +317,7 @@ const ModelConfig = forwardRef<ModelConfigRef, ModelConfigProps>(
               support_images: value.support_image,
               support_computer_use: value.support_compute,
               support_prompt_cache: value.support_prompt_caching,
+              temperature: value.temperature,
             },
           })
           .then(res => {
@@ -1600,21 +1603,22 @@ const ModelConfig = forwardRef<ModelConfigRef, ModelConfigProps>(
                     >
                       可选
                     </Box>
-                    {modelData['analysis-vl'] && (
-                      <Switch
-                        size='small'
-                        checked={modelData['analysis-vl'].is_active}
-                        onChange={() => {
-                          putApiV1Model({
-                            ...modelData['analysis-vl'],
-                            is_active: !modelData['analysis-vl'].is_active,
-                          }).then(() => {
-                            message.success('修改成功');
-                            getModelList();
-                          });
-                        }}
-                      />
-                    )}
+                    {modelData['analysis-vl'] &&
+                      modelData['analysis-vl'].id && (
+                        <Switch
+                          size='small'
+                          checked={modelData['analysis-vl'].is_active}
+                          onChange={() => {
+                            putApiV1Model({
+                              ...modelData['analysis-vl'],
+                              is_active: !modelData['analysis-vl'].is_active,
+                            }).then(() => {
+                              message.success('修改成功');
+                              getModelList();
+                            });
+                          }}
+                        />
+                      )}
                   </Stack>
                   <Box sx={{ fontSize: 12, color: 'text.tertiary', mt: 1 }}>
                     在
