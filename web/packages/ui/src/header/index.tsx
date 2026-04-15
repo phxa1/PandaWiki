@@ -1,20 +1,19 @@
 'use client';
-import React, { useState, useEffect } from 'react';
-import { IconSousuo, IconZhinengwenda } from '@panda-wiki/icons';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
 import {
+  alpha,
   Box,
   Button,
   IconButton,
-  Stack,
-  TextField,
   Link,
-  alpha,
   Menu,
   MenuItem,
+  Stack,
+  TextField,
 } from '@mui/material';
-import MoreVertIcon from '@mui/icons-material/MoreVert';
+import { IconSousuo } from '@panda-wiki/icons';
+import React, { useEffect, useState } from 'react';
 import NavBtns, { NavBtn } from './NavBtns';
-import { DocWidth } from '../constants';
 
 // 检测平台类型
 const isMac = () => /Mac|iPod|iPhone|iPad/.test(navigator.userAgent);
@@ -102,7 +101,7 @@ const Header = React.memo(
         sx={{
           transition: 'left 0.2s ease-in-out',
           position: 'sticky',
-          zIndex: 10,
+          zIndex: 101,
           top: 0,
           left: 0,
           right: 0,
@@ -150,12 +149,27 @@ const Header = React.memo(
                 color: 'text.primary',
                 textDecoration: 'none',
                 '&:hover': { color: 'primary.main' },
+                ...(mobile && {
+                  minWidth: 0,
+                  overflow: 'hidden',
+                }),
               }}
             >
-              {logo && <img src={logo} alt='logo' height={36} />}
+              {logo && (
+                <img
+                  src={logo}
+                  alt='logo'
+                  height={36}
+                  style={{
+                    flexShrink: mobile ? 1 : 0,
+                    maxWidth: mobile ? '100%' : 'none',
+                    objectFit: 'contain',
+                  }}
+                />
+              )}
               <Box
                 sx={{
-                  fontSize: 20,
+                  fontSize: mobile ? 16 : 20,
                   whiteSpace: 'nowrap',
                   textOverflow: 'ellipsis',
                   overflow: 'hidden',

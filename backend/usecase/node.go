@@ -13,6 +13,7 @@ import (
 	"github.com/samber/lo"
 	"gorm.io/gorm"
 
+	navV1 "github.com/chaitin/panda-wiki/api/nav/v1"
 	v1 "github.com/chaitin/panda-wiki/api/node/v1"
 	shareV1 "github.com/chaitin/panda-wiki/api/share/v1"
 	"github.com/chaitin/panda-wiki/consts"
@@ -27,6 +28,7 @@ import (
 
 type NodeUsecase struct {
 	nodeRepo     *pg.NodeRepository
+	navRepo      *pg.NavRepository
 	appRepo      *pg.AppRepository
 	ragRepo      *mq.RAGRepository
 	kbRepo       *pg.KnowledgeBaseRepository
@@ -42,6 +44,7 @@ type NodeUsecase struct {
 
 func NewNodeUsecase(
 	nodeRepo *pg.NodeRepository,
+	navRepo *pg.NavRepository,
 	appRepo *pg.AppRepository,
 	ragRepo *mq.RAGRepository,
 	userRepo *pg.UserRepository,
@@ -56,6 +59,7 @@ func NewNodeUsecase(
 ) *NodeUsecase {
 	return &NodeUsecase{
 		nodeRepo:     nodeRepo,
+		navRepo:      navRepo,
 		rAGService:   ragService,
 		appRepo:      appRepo,
 		ragRepo:      ragRepo,
@@ -158,6 +162,12 @@ func (u *NodeUsecase) NodeAction(ctx context.Context, req *domain.NodeActionReq)
 }
 
 func (u *NodeUsecase) Update(ctx context.Context, req *domain.UpdateNodeReq, userId string) error {
+	if req.NavId != nil {
+		_, err := u.navRepo.GetById(ctx, *req.NavId)
+		if err != nil {
+			return errors.New("invalid nav_id")
+		}
+	}
 	err := u.nodeRepo.UpdateNodeContent(ctx, req, userId)
 	if err != nil {
 		return err
@@ -257,39 +267,51 @@ func (u *NodeUsecase) MoveNode(ctx context.Context, req *domain.MoveNodeReq) err
 	return u.nodeRepo.MoveNodeBetween(ctx, req.ID, req.ParentID, req.PrevID, req.NextID, req.KbID)
 }
 
-func (u *NodeUsecase) SummaryNode(ctx context.Context, req *domain.NodeSummaryReq) (string, error) {
+func (u *NodeUsecase) SummaryNode(ctx context.Context, req *domain.NodeSummaryReq) error {
+	_, err := u.modelUsecase.GetChatModel(ctx)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domain.ErrModelNotConfigured
+		}
+		return err
+	}
+	// async create node summary
+	nodeVectorContentRequests := make([]*domain.NodeReleaseVectorRequest, 0)
+	for _, id := range req.IDs {
+		nodeVectorContentRequests = append(nodeVectorContentRequests, &domain.NodeReleaseVectorRequest{
+			KBID:   req.KBID,
+			NodeID: id,
+			Action: "summary",
+		})
+	}
+	if err := u.ragRepo.AsyncUpdateNodeReleaseVector(ctx, nodeVectorContentRequests); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (u *NodeUsecase) StreamSummaryNode(ctx context.Context, req *domain.NodeSummaryReq, onChunk func(ctx context.Context, dataType, chunk string) error) error {
 	model, err := u.modelUsecase.GetChatModel(ctx)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return "", domain.ErrModelNotConfigured
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domain.ErrModelNotConfigured
 		}
-		return "", err
+		return err
 	}
-	if len(req.IDs) == 1 {
-		node, err := u.nodeRepo.GetNodeByID(ctx, req.IDs[0])
-		if err != nil {
-			return "", fmt.Errorf("get latest node release failed: %w", err)
-		}
-		summary, err := u.llmUsecase.SummaryNode(ctx, req.KBID, model, node.Name, node.Content)
-		if err != nil {
-			return "", fmt.Errorf("summary node failed: %w", err)
-		}
-		return summary, nil
-	} else {
-		// async create node summary
-		nodeVectorContentRequests := make([]*domain.NodeReleaseVectorRequest, 0)
-		for _, id := range req.IDs {
-			nodeVectorContentRequests = append(nodeVectorContentRequests, &domain.NodeReleaseVectorRequest{
-				KBID:   req.KBID,
-				NodeID: id,
-				Action: "summary",
-			})
-		}
-		if err := u.ragRepo.AsyncUpdateNodeReleaseVector(ctx, nodeVectorContentRequests); err != nil {
-			return "", err
-		}
+	if len(req.IDs) != 1 {
+		return fmt.Errorf("stream summary only supports single node")
 	}
-	return "", nil
+
+	node, err := u.nodeRepo.GetNodeByID(ctx, req.IDs[0])
+	if err != nil {
+		return fmt.Errorf("get latest node release failed: %w", err)
+	}
+
+	if err := u.llmUsecase.StreamSummaryNode(ctx, req.KBID, model, node.Name, node.Content, onChunk); err != nil {
+		return fmt.Errorf("summary node failed: %w", err)
+	}
+	return nil
 }
 
 func (u *NodeUsecase) GetRecommendNodeList(ctx context.Context, req *domain.GetRecommendNodeListReq) ([]*domain.RecommendNodeListResp, error) {
@@ -301,21 +323,36 @@ func (u *NodeUsecase) GetRecommendNodeList(ctx context.Context, req *domain.GetR
 		}
 		return nil, err
 	}
-	nodes, err := u.nodeRepo.GetRecommendNodeListByIDs(ctx, req.KBID, kbRelease.ID, req.NodeIDs)
-	if err != nil {
-		return nil, err
+
+	var nodes []*domain.RecommendNodeListResp
+
+	// 优先通过 NavIds 搜索，如果 NavIds 为空则使用 NodeIDs
+	if len(req.NavIds) > 0 {
+		nodes, err = u.nodeRepo.GetRecommendNodeListByNavIDs(ctx, req.KBID, kbRelease.ID, req.NavIds)
+		if err != nil {
+			return nil, err
+		}
+	} else if len(req.NodeIDs) > 0 {
+		nodes, err = u.nodeRepo.GetRecommendNodeListByIDs(ctx, req.KBID, kbRelease.ID, req.NodeIDs)
+		if err != nil {
+			return nil, err
+		}
 	}
+
 	if len(nodes) > 0 {
-		// sort nodes by req.NodeIDs order
-		nodesMap := lo.SliceToMap(nodes, func(item *domain.RecommendNodeListResp) (string, *domain.RecommendNodeListResp) {
-			return item.ID, item
-		})
-		nodes = make([]*domain.RecommendNodeListResp, 0)
-		for _, id := range req.NodeIDs {
-			if node, ok := nodesMap[id]; ok {
-				nodes = append(nodes, node)
+		// 如果是通过 NodeIDs 查询，按照 req.NodeIDs 的顺序排序
+		if len(req.NodeIDs) > 0 && len(req.NavIds) == 0 {
+			nodesMap := lo.SliceToMap(nodes, func(item *domain.RecommendNodeListResp) (string, *domain.RecommendNodeListResp) {
+				return item.ID, item
+			})
+			nodes = make([]*domain.RecommendNodeListResp, 0)
+			for _, id := range req.NodeIDs {
+				if node, ok := nodesMap[id]; ok {
+					nodes = append(nodes, node)
+				}
 			}
 		}
+
 		// get folder nodes
 		folderNodeIds := lo.Filter(nodes, func(item *domain.RecommendNodeListResp, _ int) bool {
 			return item.Type == domain.NodeTypeFolder
@@ -342,6 +379,20 @@ func (u *NodeUsecase) BatchMoveNode(ctx context.Context, req *domain.BatchMoveRe
 	return u.nodeRepo.BatchMove(ctx, req)
 }
 
+func (u *NodeUsecase) MoveNodeNav(ctx context.Context, req *v1.NodeMoveNavReq) error {
+	nav, err := u.navRepo.GetById(ctx, req.NavID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("nav not found: %w", err)
+		}
+		return err
+	}
+	if nav.KbID != req.KbID {
+		return fmt.Errorf("nav does not belong to kb %s", req.KbID)
+	}
+	return u.nodeRepo.MoveNodeNav(ctx, req.KbID, req.NavID, req.IDs)
+}
+
 func (u *NodeUsecase) convertMDToHTML(mdStr string) string {
 	extensions := parser.CommonExtensions & ^parser.Autolink & ^parser.MathJax
 	p := parser.NewWithExtensions(extensions)
@@ -357,9 +408,9 @@ func (u *NodeUsecase) convertMDToHTML(mdStr string) string {
 	return string(html)
 }
 
-func (u *NodeUsecase) GetNodeReleaseListByKBID(ctx context.Context, kbID string, authId uint) ([]*domain.ShareNodeListItemResp, error) {
+func (u *NodeUsecase) GetShareNodeList(ctx context.Context, kbId string, authId uint) ([]*shareV1.NodeListGroupNavResp, error) {
 
-	nodes, err := u.nodeRepo.GetNodeReleaseListByKBID(ctx, kbID)
+	nodes, err := u.nodeRepo.GetNodeReleaseListByKBID(ctx, kbId)
 	if err != nil {
 		return nil, err
 	}
@@ -369,20 +420,45 @@ func (u *NodeUsecase) GetNodeReleaseListByKBID(ctx context.Context, kbID string,
 		return nil, err
 	}
 
-	items := make([]*domain.ShareNodeListItemResp, 0)
+	navs, err := u.navRepo.GetReleaseList(ctx, kbId)
+	if err != nil {
+		return nil, err
+	}
 
-	for i, node := range nodes {
+	result := make([]*shareV1.NodeListGroupNavResp, 0, len(navs))
+	navIndexMap := make(map[string]int, len(navs))
+	for _, nav := range navs {
+		navIndexMap[nav.ID] = len(result)
+		result = append(result, &shareV1.NodeListGroupNavResp{
+			NavID:    nav.ID,
+			NavName:  nav.Name,
+			Position: nav.Position,
+			List:     []domain.ShareNodeListItemResp{},
+		})
+	}
+
+	// O(1) auth group lookup
+	nodeGroupIdSet := lo.SliceToMap(nodeGroupIds, func(id string) (string, struct{}) {
+		return id, struct{}{}
+	})
+
+	for _, node := range nodes {
 		switch node.Permissions.Visible {
 		case consts.NodeAccessPermOpen:
-			items = append(items, nodes[i])
 		case consts.NodeAccessPermPartial:
-			if slices.Contains(nodeGroupIds, node.ID) {
-				items = append(items, nodes[i])
+			if _, ok := nodeGroupIdSet[node.ID]; !ok {
+				continue
 			}
+		default:
+			continue
+		}
+		if idx, ok := navIndexMap[node.NavId]; ok {
+			result[idx].List = append(result[idx].List, *node)
+			result[idx].Count++
 		}
 	}
 
-	return items, nil
+	return result, nil
 }
 
 func (u *NodeUsecase) GetNodeReleaseListByParentID(ctx context.Context, kbID, parentID string, authId uint) ([]*domain.ShareNodeDetailItem, error) {
@@ -709,4 +785,91 @@ func (u *NodeUsecase) NodeRestudy(ctx context.Context, req *v1.NodeRestudyReq) e
 	}
 
 	return nil
+}
+
+func (u *NodeUsecase) GetNodeStats(ctx context.Context, kbId string) (*v1.NodeStatsResp, error) {
+	resp, err := u.nodeRepo.GetNodeStats(ctx, kbId)
+	if err != nil {
+		return nil, err
+	}
+
+	navs, err := u.navRepo.GetList(ctx, kbId)
+	if err != nil {
+		return nil, err
+	}
+
+	navsReleased, err := u.navRepo.GetReleaseList(ctx, kbId)
+	if err != nil {
+		return nil, err
+	}
+
+	navsReleasedMap := make(map[string]*navV1.NavListResp, len(navsReleased))
+	for _, nr := range navsReleased {
+		navsReleasedMap[nr.ID] = &nr
+	}
+
+	for _, nav := range navs {
+		navsRelease, found := navsReleasedMap[nav.ID]
+		if !found || navsRelease.Position != nav.Position || navsRelease.Name != nav.Name {
+			resp.UnreleasedNavCount++
+		}
+	}
+	return resp, nil
+}
+
+func (u *NodeUsecase) GetNodeListGroupByNav(ctx context.Context, req v1.NodeListGroupNavReq) ([]*v1.NodeListGroupNavResp, error) {
+	nodes, err := u.nodeRepo.GetNodeListByStatus(ctx, req.KbId, req.Status, req.Search)
+	if err != nil {
+		return nil, err
+	}
+
+	navs, err := u.navRepo.GetListByIds(ctx, req.KbId, req.NavIds)
+	if err != nil {
+		return nil, err
+	}
+
+	navsReleased, err := u.navRepo.GetReleaseList(ctx, req.KbId)
+	if err != nil {
+		return nil, err
+	}
+
+	navsReleasedMap := make(map[string]*navV1.NavListResp, len(navsReleased))
+	for _, nr := range navsReleased {
+		navsReleasedMap[nr.ID] = &nr
+	}
+
+	// 按 position 顺序预建分组，用 map 做 O(1) 索引
+	result := make([]*v1.NodeListGroupNavResp, 0, len(navs))
+	navIndexMap := make(map[string]int, len(navs))
+	for _, nav := range navs {
+		release, found := navsReleasedMap[nav.ID]
+		navIndexMap[nav.ID] = len(result)
+		result = append(result, &v1.NodeListGroupNavResp{
+			NavID:      nav.ID,
+			NavName:    nav.Name,
+			Position:   nav.Position,
+			IsReleased: found && release.Position == nav.Position && release.Name == nav.Name,
+			List:       []domain.NodeListItemResp{},
+		})
+	}
+
+	for _, node := range nodes {
+		if idx, ok := navIndexMap[node.NavId]; ok {
+			result[idx].List = append(result[idx].List, *node)
+			result[idx].Count++
+		}
+	}
+
+	// 搜索时过滤掉空分组
+	if req.Search != "" {
+		filtered := make([]*v1.NodeListGroupNavResp, 0, len(result))
+		for _, group := range result {
+			if group.Count > 0 {
+				filtered = append(filtered, group)
+			}
+		}
+		return filtered, nil
+	}
+
+	return result, nil
 }

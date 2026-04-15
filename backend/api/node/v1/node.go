@@ -15,6 +15,7 @@ type GetNodeDetailReq struct {
 type NodeDetailResp struct {
 	ID               string                 `json:"id"`
 	KbID             string                 `json:"kb_id"`
+	NavId            string                 `json:"nav_id"`
 	Type             domain.NodeType        `json:"type"`
 	Status           domain.NodeStatus      `json:"status"`
 	Name             string                 `json:"name"`
@@ -64,4 +65,36 @@ type NodeRestudyReq struct {
 }
 
 type NodeRestudyResp struct {
+}
+
+type NodeStatsReq struct {
+	KbId string `query:"kb_id" json:"kb_id" validate:"required"`
+}
+
+type NodeStatsResp struct {
+	UnpublishedCount   int64 `json:"unpublished_count"`    // 未发布的文档数
+	UnstudiedCount     int64 `json:"unstudied_count"`      // 未学习的文档数
+	UnreleasedNavCount int64 `json:"unreleased_nav_count"` // 未发布目录数量
+}
+
+type NodeMoveNavReq struct {
+	IDs   []string `json:"ids" query:"[]ids" validate:"required,min=1"`
+	KbID  string   `json:"kb_id" validate:"required"`
+	NavID string   `json:"nav_id" validate:"required"`
+}
+
+type NodeListGroupNavReq struct {
+	KbId   string   `json:"kb_id" query:"kb_id" validate:"required"`
+	NavIds []string `json:"nav_ids" query:"nav_ids[]"`
+	Search string   `json:"search" query:"search"`
+	Status string   `json:"status" query:"status" validate:"omitempty,oneof=released unpublished unstudied"`
+}
+
+type NodeListGroupNavResp struct {
+	NavName    string                    `json:"nav_name"`
+	NavID      string                    `json:"nav_id"`
+	Position   float64                   `json:"position"`
+	Count      int64                     `json:"count"`
+	IsReleased bool                      `json:"is_released"`
+	List       []domain.NodeListItemResp `json:"list"`
 }

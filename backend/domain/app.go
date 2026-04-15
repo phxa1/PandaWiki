@@ -126,6 +126,7 @@ type AppSettings struct {
 	WeChatServiceEncodingAESKey  string   `json:"wechat_service_encodingaeskey,omitempty"`
 	WeChatServiceCorpID          string   `json:"wechat_service_corpid,omitempty"`
 	WeChatServiceSecret          string   `json:"wechat_service_secret,omitempty"`
+	WechatServiceLogo            string   `json:"wechat_service_logo,omitempty"`
 	WechatServiceContainKeywords []string `json:"wechat_service_contain_keywords"`
 	WechatServiceEqualKeywords   []string `json:"wechat_service_equal_keywords"`
 	// DisCordBot
@@ -242,6 +243,11 @@ type DirDocConfig struct {
 	BgColor    string `json:"bg_color"`
 }
 
+type NavDocConfig struct {
+	NavIds []string `json:"nav_ids"`
+	Title  string   `json:"title"`
+}
+
 type SimpleDocConfig struct {
 	Title      string `json:"title"`
 	TitleColor string `json:"title_color"`
@@ -351,6 +357,7 @@ type WebAppLandingConfig struct {
 	BannerConfig    *BannerConfig    `json:"banner_config,omitempty"`
 	BasicDocConfig  *BasicDocConfig  `json:"basic_doc_config,omitempty"`
 	DirDocConfig    *DirDocConfig    `json:"dir_doc_config,omitempty"`
+	NavDocConfig    *NavDocConfig    `json:"nav_doc_config,omitempty"`
 	SimpleDocConfig *SimpleDocConfig `json:"simple_doc_config,omitempty"`
 	CarouselConfig  *CarouselConfig  `json:"carousel_config,omitempty"`
 	FaqConfig       *FaqConfig       `json:"faq_config,omitempty"`
@@ -525,6 +532,7 @@ type AppSettingsResp struct {
 	WeChatServiceEncodingAESKey  string   `json:"wechat_service_encodingaeskey,omitempty"`
 	WeChatServiceCorpID          string   `json:"wechat_service_corpid,omitempty"`
 	WeChatServiceSecret          string   `json:"wechat_service_secret,omitempty"`
+	WechatServiceLogo            string   `json:"wechat_service_logo,omitempty"`
 	WechatServiceContainKeywords []string `json:"wechat_service_contain_keywords"`
 	WechatServiceEqualKeywords   []string `json:"wechat_service_equal_keywords"`
 
@@ -582,6 +590,7 @@ type WebAppLandingConfigResp struct {
 	BannerConfig    *BannerConfig            `json:"banner_config,omitempty"`
 	BasicDocConfig  *BasicDocConfig          `json:"basic_doc_config,omitempty"`
 	DirDocConfig    *DirDocConfig            `json:"dir_doc_config,omitempty"`
+	NavDocConfig    *NavDocConfig            `json:"nav_doc_config,omitempty"`
 	SimpleDocConfig *SimpleDocConfig         `json:"simple_doc_config,omitempty"`
 	CarouselConfig  *CarouselConfig          `json:"carousel_config,omitempty"`
 	FaqConfig       *FaqConfig               `json:"faq_config,omitempty"`

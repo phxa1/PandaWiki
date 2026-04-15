@@ -41,12 +41,12 @@ export enum DomainNodeType {
 
 /** @format int32 */
 export enum DomainNodeStatus {
-  /** 未发布 */
+  /** 草稿 */
   NodeStatusUnreleased = 0,
   /** 更新未发布 */
   NodeStatusDraft = 1,
   /** 已发布 */
-  NodeStatusReleased = 2,
+  NodeStatusPublished = 2,
 }
 
 export enum DomainModelType {
@@ -393,6 +393,7 @@ export interface DomainAppSettings {
   wechat_service_equal_keywords?: string[];
   /** WechatServiceBot */
   wechat_service_is_enabled?: boolean;
+  wechat_service_logo?: string;
   wechat_service_secret?: string;
   wechat_service_token?: string;
   /** WecomAIBotSettings 企业微信智能机器人 */
@@ -482,6 +483,7 @@ export interface DomainAppSettingsResp {
   wechat_service_equal_keywords?: string[];
   /** WechatServiceBot */
   wechat_service_is_enabled?: boolean;
+  wechat_service_logo?: string;
   wechat_service_secret?: string;
   wechat_service_token?: string;
   wecom_ai_bot_settings?: DomainWecomAIBotSettings;
@@ -769,6 +771,7 @@ export interface DomainCreateNodeReq {
   emoji?: string;
   kb_id: string;
   name: string;
+  nav_id: string;
   parent_id?: string;
   position?: number;
   summary?: string;
@@ -991,6 +994,11 @@ export interface DomainMoveNodeReq {
   prev_id?: string;
 }
 
+export interface DomainNavDocConfig {
+  nav_ids?: string[];
+  title?: string;
+}
+
 export interface DomainNodeActionReq {
   action: "delete";
   ids: string[];
@@ -1024,6 +1032,7 @@ export interface DomainNodeListItemResp {
   emoji?: string;
   id?: string;
   name?: string;
+  nav_id?: string;
   parent_id?: string;
   permissions?: DomainNodePermissions;
   position?: number;
@@ -1198,6 +1207,8 @@ export interface DomainRecommendNodeListResp {
   emoji?: string;
   id?: string;
   name?: string;
+  nav_id?: string;
+  nav_name?: string;
   parent_id?: string;
   permissions?: DomainNodePermissions;
   position?: number;
@@ -1352,6 +1363,7 @@ export interface DomainUpdateNodeReq {
   id: string;
   kb_id: string;
   name?: string;
+  nav_id?: string;
   position?: number;
   summary?: string;
 }
@@ -1406,6 +1418,7 @@ export interface DomainWebAppLandingConfig {
   feature_config?: DomainFeatureConfig;
   img_text_config?: DomainImgTextConfig;
   metrics_config?: DomainMetricsConfig;
+  nav_doc_config?: DomainNavDocConfig;
   node_ids?: string[];
   question_config?: DomainQuestionConfig;
   simple_doc_config?: DomainSimpleDocConfig;
@@ -1427,6 +1440,7 @@ export interface DomainWebAppLandingConfigResp {
   feature_config?: DomainFeatureConfig;
   img_text_config?: DomainImgTextConfig;
   metrics_config?: DomainMetricsConfig;
+  nav_doc_config?: DomainNavDocConfig;
   node_ids?: string[];
   nodes?: DomainRecommendNodeListResp[];
   question_config?: DomainQuestionConfig;
@@ -1470,6 +1484,15 @@ export interface GithubComChaitinPandaWikiApiAuthV1AuthGetResp {
   client_secret?: string;
   proxy?: string;
   source_type?: ConstsSourceType;
+}
+
+export interface GithubComChaitinPandaWikiApiNodeV1NodeListGroupNavResp {
+  count?: number;
+  is_released?: boolean;
+  list?: DomainNodeListItemResp[];
+  nav_id?: string;
+  nav_name?: string;
+  position?: number;
 }
 
 export interface GithubComChaitinPandaWikiApiShareV1AuthGetResp {
@@ -1692,6 +1715,33 @@ export interface V1LoginResp {
   token?: string;
 }
 
+export interface V1NavAddReq {
+  kb_id: string;
+  name: string;
+  position?: number;
+}
+
+export interface V1NavListResp {
+  created_at?: string;
+  id?: string;
+  name?: string;
+  position?: number;
+  updated_at?: string;
+}
+
+export interface V1NavMoveReq {
+  id: string;
+  kb_id: string;
+  next_id?: string;
+  prev_id?: string;
+}
+
+export interface V1NavUpdateReq {
+  id: string;
+  kb_id: string;
+  name: string;
+}
+
 export interface V1NodeDetailResp {
   content?: string;
   created_at?: string;
@@ -1703,6 +1753,7 @@ export interface V1NodeDetailResp {
   kb_id?: string;
   meta?: DomainNodeMeta;
   name?: string;
+  nav_id?: string;
   parent_id?: string;
   permissions?: DomainNodePermissions;
   publisher_account?: string;
@@ -1711,6 +1762,13 @@ export interface V1NodeDetailResp {
   status?: DomainNodeStatus;
   type?: DomainNodeType;
   updated_at?: string;
+}
+
+export interface V1NodeMoveNavReq {
+  /** @minItems 1 */
+  ids: string[];
+  kb_id: string;
+  nav_id: string;
 }
 
 export interface V1NodePermissionEditReq {
@@ -1745,6 +1803,15 @@ export interface V1NodeRestudyReq {
 }
 
 export type V1NodeRestudyResp = Record<string, any>;
+
+export interface V1NodeStatsResp {
+  /** 未发布的文档数 */
+  unpublished_count?: number;
+  /** 未发布目录数量 */
+  unreleased_nav_count?: number;
+  /** 未学习的文档数 */
+  unstudied_count?: number;
+}
 
 export interface V1ResetPasswordReq {
   id: string;
@@ -1958,6 +2025,15 @@ export interface GetApiV1KnowledgeBaseUserListParams {
   kb_id: string;
 }
 
+export interface DeleteApiV1NavDeleteParams {
+  id: string;
+  kb_id: string;
+}
+
+export interface GetApiV1NavListParams {
+  kb_id: string;
+}
+
 export interface GetApiV1NodeDetailParams {
   format?: string;
   id: string;
@@ -1966,7 +2042,15 @@ export interface GetApiV1NodeDetailParams {
 
 export interface GetApiV1NodeListParams {
   kb_id: string;
+  nav_id?: string;
   search?: string;
+}
+
+export interface GetApiV1NodeListGroupNavParams {
+  kb_id: string;
+  nav_ids?: string[];
+  search?: string;
+  status?: "released" | "unpublished" | "unstudied";
 }
 
 export interface GetApiV1NodePermissionParams {
@@ -1976,7 +2060,12 @@ export interface GetApiV1NodePermissionParams {
 
 export interface GetApiV1NodeRecommendNodesParams {
   kb_id: string;
-  node_ids: string[];
+  nav_ids?: string[];
+  node_ids?: string[];
+}
+
+export interface GetApiV1NodeStatsParams {
+  kb_id: string;
 }
 
 export interface GetApiV1StatBrowsersParams {
@@ -2051,6 +2140,10 @@ export interface PostShareV1CommonFileUploadPayload {
 export interface GetShareV1ConversationDetailParams {
   /** conversation id */
   id: string;
+}
+
+export interface GetShareV1NavListParams {
+  kb_id: string;
 }
 
 export interface GetShareV1NodeDetailParams {
